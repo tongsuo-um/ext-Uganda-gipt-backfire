@@ -1,0 +1,403 @@
+---
+title: "G2R GIPT Backfire - Supplementary Materials"
+subtitle: "Cohort 2 Trial B"
+author: "Tong Suo"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  html_document:
+    code_folding: hide
+    df_print: kable
+    theme: sandstone
+    toc: true
+    toc_float: true
+    toc_depth: 4
+fontsize: 12pt
+---
+
+```{r global_setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  tidy = TRUE,
+  out.width = "95%")
+options(scipen=999)
+```
+
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(modelsummary)
+library(rio)
+library(knitr)
+library(kableExtra)
+library(broom)
+library(purrr)
+library(tibble)
+library(forcats)
+library(patchwork)
+library(ggh4x)
+library(psych)
+library(webshot2)
+```
+
+```{r helper_func, include=FALSE}
+# APA number formatter: fixed digits after the decimal, no leading zero when
+# |x| < 1  (e.g. 0.234 -> .23, -0.234 -> -.23).  Reused from the main analysis.
+apa_num <- function(x, digits = 2) {
+  s <- ifelse(is.na(x), "",
+              sprintf(paste0("%.", digits, "f"), x))
+  sub("^(-?)0\\.", "\\1.", s)
+}
+
+std_to_ref <- function(x, ref, sign = 1) {
+  m  <- mean(ref, na.rm = TRUE)
+  s  <- sd(ref,   na.rm = TRUE)
+  sign * (x - m) / s
+}
+
+# ---------------------------------------------------------------------------
+# build_cor_table(df, vars, labels)
+# ---------------------------------------------------------------------------
+# Returns a tibble that renders as a lower-triangular correlation matrix with
+# APA-formatted cells and superscript significance signs.  Each numeric cell
+# is wrapped in the same 5em fixed-width block used by the regression tables,
+# so decimals line up across rows AND across columns:
+#
+#     [   .23<sup>*</sup>  ]
+#     [ -.45<sup>***</sup> ]
+#     [   .01              ]
+#
+# * Pearson r via pairwise-complete `cor.test`.
+# * sig sign scheme (matches the regression tables):
+#     † p < .10   * p < .05   ** p < .01   *** p < .001
+# * Diagonal shows an em-dash; upper triangle is left blank.
+build_cor_table <- function(df, vars, labels, digits = 2,
+                             cell_width = "4em") {
+
+  pad_cell <- function(num_str, sig_str = "") {
+    paste0(
+      "<span style='display:inline-block;width:", cell_width,
+      ";text-align:right'>",
+      num_str,
+      "<span style='display:inline-block;min-width:1.4em;text-align:left'>",
+      sig_str,
+      "</span></span>"
+    )
+  }
+
+  sig_sup <- function(p) dplyr::case_when(
+    is.na(p) ~ "",
+    p < 0.001 ~ "<sup>***</sup>",
+    p < 0.01  ~ "<sup>**</sup>",
+    p < 0.05  ~ "<sup>*</sup>",
+    p < 0.10  ~ "<sup>&dagger;</sup>",
+    TRUE      ~ ""
+  )
+
+  x <- df %>% dplyr::select(dplyr::all_of(vars)) %>% as.matrix()
+  n <- length(vars)
+  cells <- matrix("", n, n, dimnames = list(labels, labels))
+
+  for (i in seq_len(n)) {
+    for (j in seq_len(n)) {
+      if (j > i) {
+        cells[i, j] <- ""              # blank upper triangle
+      } else if (i == j) {
+        cells[i, j] <- pad_cell("—")   # diagonal
+      } else {
+        pair <- na.omit(x[, c(i, j)])
+        if (nrow(pair) < 3) {
+          cells[i, j] <- pad_cell("")
+        } else {
+          ct <- suppressWarnings(cor.test(pair[, 1], pair[, 2]))
+          cells[i, j] <- pad_cell(apa_num(ct$estimate, digits),
+                                  sig_sup(ct$p.value))
+        }
+      }
+    }
+  }
+
+  tibble::as_tibble(cells, rownames = "Variable")
+}
+
+# ---- Fixed-width right-aligned spans so decimals column-align across rows ----
+num_cell <- function(x, w = "3.5em")
+  paste0("<span style='display:inline-block;width:", w,
+         ";text-align:right'>", x, "</span>")
+
+n_cell <- function(n, w = "3.5em")
+  paste0("<span style='display:inline-block;width:", w,
+         ";text-align:right'>", format(n, big.mark = ","), "</span>")
+
+range_cell <- function(lo, hi) {
+  if (is.na(lo) || is.na(hi)) return("")
+  paste0(num_cell(apa_num(lo)), " – ", num_cell(apa_num(hi)))
+}
+
+# ---- Build one row of stats from a (var, label, df, theo_lo, theo_hi) ----
+compute_row <- function(var, label, df, theo_lo, theo_hi) {
+  x <- as.numeric(df[[var]])
+  x <- x[!is.na(x)]
+  tibble::tibble(
+    Variable            = label,
+    N                   = n_cell(length(x)),
+    Mean                = num_cell(apa_num(mean(x))),
+    Median              = num_cell(apa_num(median(x))),
+    SD                  = num_cell(apa_num(sd(x))),
+    `Theoretical range` = range_cell(theo_lo, theo_hi),
+    `Observed range`    = range_cell(min(x), max(x))
+  )
+}
+```
+
+
+```{r import_data, include=FALSE}
+C2TB_bsl <- import("gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
+
+C2TB_stfu_wins <-
+  import("gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
+
+C2TB_enl_wins <-
+  import("gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
+```
+
+
+# Table S1. Descriptive statistics for Outcome Variables
+```{r outcome_desp}
+# Order of time points: baseline block, then 3m FU block, then 20m FU block.
+# Theoretical range reported only for the scale-bounded measures (K6, Cantril
+# ladder, FCS, K10, PHQ-9, GAD-7, subjective peacefulness, positive affect);
+# left blank for the composite z-score indices and the two binary baseline
+# indicators.
+#
+# Baseline block: pulled from C2TB_bsl (the baseline analysis file). Note:
+# baseline Ns here reflect the full baseline sample, which can differ from
+# the Ns for the same `*_bsl` columns in C2TB_stfu_wins (restricted to HHs
+# that reached the 3m FU).
+# 3m FU block:    C2TB_stfu_wins.
+# 20m FU block:   C2TB_enl_wins.
+
+# ---- Variable specification ----
+# wave_set: "bsl" => baseline block only
+#           "fu"  => appears in BOTH 3m FU and 20m FU blocks
+desc_vars <- tibble::tribble(
+  ~var,                   ~label,                               ~wave_set, ~theo_lo, ~theo_hi,
+  "kessler_6_bsl",        "Kessler-6",                          "bsl",      0,        24,
+  "cantrils_bsl",         "Global life satisfaction",          "bsl",      1,        10,
+  "bsl_fambus",           "Household owns family business",     "bsl",      NA,       NA,
+  "bsl_outhh_empl",       "Household member works for payment", "bsl",      NA,       NA,
+  "fcs_bsl",              "Food consumption score",             "bsl",      0,        112,
+  "psych_distress_index", "Psychological distress index",       "fu",       NA,       NA,
+  "kessler_10",           "Kessler-10",                         "fu",       0,        40,
+  "phq_total_score",      "PHQ-9",                              "fu",       0,        27,
+  "gad_total_score",      "GAD-7",                              "fu",       0,        21,
+  "psych_well_being_z",   "Psychological well-being index",       "fu",       NA,       NA,
+  "cantrils",             "Global life satisfaction",          "fu",       1,        10,
+  "subj_peace",           "Subjective peacefulness",            "fu",       1,        10,
+  "positive_affect",      "Positive affect",                    "fu",       0,        1,
+  "econ_activity_index",  "Economic activity index",            "fu",       NA,       NA,
+  "labor_supply_index",   "Labor supply index",                 "fu",       NA,       NA,
+  "investment_index",     "Investment index",                   "fu",       NA,       NA,
+  "econ_expansion_index", "Economic expansion index",           "fu",       NA,       NA,
+  "fcs",                  "Food consumption score",             "fu",       0,        112
+)
+
+bsl_idx <- which(desc_vars$wave_set == "bsl")
+fu_idx  <- which(desc_vars$wave_set == "fu")
+
+rows_bsl <- purrr::map_dfr(bsl_idx, function(i) {
+  r <- desc_vars[i, ]
+  compute_row(r$var, r$label, C2TB_bsl, r$theo_lo, r$theo_hi)
+})
+rows_stfu <- purrr::map_dfr(fu_idx, function(i) {
+  r <- desc_vars[i, ]
+  compute_row(r$var, r$label, C2TB_stfu_wins, r$theo_lo, r$theo_hi)
+})
+rows_enl <- purrr::map_dfr(fu_idx, function(i) {
+  r <- desc_vars[i, ]
+  compute_row(r$var, r$label, C2TB_enl_wins,  r$theo_lo, r$theo_hi)
+})
+
+desc_tbl <- dplyr::bind_rows(rows_bsl, rows_stfu, rows_enl)
+
+n_bsl <- nrow(rows_bsl)
+n_fu  <- nrow(rows_stfu)   # same as nrow(rows_enl)
+
+tableS1_kbl <-
+  kableExtra::kbl(
+    desc_tbl,
+    align   = "lcccccc",
+    escape  = FALSE
+  ) %>%
+  kableExtra::pack_rows("Baseline",            1,                  n_bsl,              bold = TRUE) %>%
+  kableExtra::pack_rows("3 month post-treatment",   n_bsl + 1,          n_bsl + n_fu,       bold = TRUE) %>%
+  kableExtra::pack_rows("20 month post-treatment",  n_bsl + n_fu + 1,   n_bsl + 2 * n_fu,   bold = TRUE) %>%
+  kableExtra::kable_styling(full_width = FALSE,
+                             bootstrap_options = c("hover", "condensed"))
+
+# Render inline (knitted HTML output + interactive session)
+tableS1_kbl
+
+# ---- Save to a high-DPI PNG next to the Rmd ----
+# zoom = 2 roughly doubles pixel density for crisp output in Word/Keynote.
+# Bump to zoom = 3 for print-quality.
+# kableExtra::save_kable(tableS1_kbl,
+#                        file = "table_S1_bsl-outcome-desp.png",
+#                        zoom = 2)
+```
+
+
+# Table S2. Correlations among primary outcomes at 3m FU and 20m FU
+
+Four primary outcomes at each of two follow-ups are jointly correlated:
+psychological distress (`psych_distress_index`), psychological well-being
+(`psych_well_being_z`), economic activity (`econ_activity_index`), and
+food security (`fcs`), each measured at the 3-month follow-up (`_stfu`)
+and the 20-month follow-up (`_enl`). Correlations are Pearson
+product-moment coefficients computed on pairwise-complete cases;
+significance signs use the same scheme as the regression tables
+(`&dagger; p < .10, * p < .05, ** p < .01, *** p < .001`).
+
+```{r cor_dv_setup, include = FALSE}
+# Wide frame of the 4 primary DVs at both follow-ups, joined on hhid.
+# `full_join` keeps every household that appears at either follow-up so no
+# pair is dropped unnecessarily; `cor.test` uses pairwise-complete cases
+# inside `build_cor_table`, so per-cell N will vary.
+cor_wide <-
+  C2TB_stfu_wins %>%
+  dplyr::select(hhid,
+                distress_stfu  = psych_distress_index,
+                wellbeing_stfu = psych_well_being_z,
+                econ_stfu      = econ_activity_index,
+                fcs_stfu       = fcs) %>%
+  dplyr::full_join(
+    C2TB_enl_wins %>%
+      dplyr::select(hhid,
+                    distress_enl  = psych_distress_index,
+                    wellbeing_enl = psych_well_being_z,
+                    econ_enl      = econ_activity_index,
+                    fcs_enl       = fcs),
+    by = "hhid"
+  )
+
+dv_vars_wide <- c("distress_stfu",  "wellbeing_stfu", "econ_stfu",  "fcs_stfu",
+                  "distress_enl",   "wellbeing_enl",  "econ_enl",   "fcs_enl")
+
+# Two-line labels via <br>: DV name on line 1, timepoint on line 2.
+dv_labels_wide <- c(
+  "Psychological distress<br><em>(3m FU)</em>",
+  "Psychological well-being<br><em>(3m FU)</em>",
+  "Economic activity<br><em>(3m FU)</em>",
+  "Food security<br><em>(3m FU)</em>",
+  "Psychological distress<br><em>(20m FU)</em>",
+  "Psychological well-being<br><em>(20m FU)</em>",
+  "Economic activity<br><em>(20m FU)</em>",
+  "Food security<br><em>(20m FU)</em>"
+)
+```
+
+```{r cor_combined}
+build_cor_table(cor_wide, dv_vars_wide, dv_labels_wide,
+                cell_width = "4em") %>%
+  kbl(align   = "lcccccccc",
+      escape  = FALSE,
+      caption = "Table S1. Correlations among primary outcomes at 3m FU and 20m FU.") %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("hover", "condensed")) %>%
+  footnote(general       = "&dagger; p < .10, * p < .05, ** p < .01, *** p < .001. Pearson correlations on pairwise-complete cases; per-cell N varies with joint missingness.",
+           general_title = "Note.",
+           escape        = FALSE,
+           footnote_as_chunk = TRUE)
+```
+
+# Table S3. Psychosocial Indices Description
+
+```{r mech_desp}
+# One row per psychosocial-mechanism index.
+# Columns: Index (pretty name), Scaling, Sample item, Cronbach's alpha,
+# Composite score creation.
+#
+# The item lists mirror Matt's cleaning script (05_merge_and_indices.do)
+# so alpha is computed on the raw items that go into each composite.
+# `psych::alpha(..., check.keys = TRUE)` auto-detects reverse-scored items,
+# which matches Matt's recodes for the communication, grit, self-control
+# and mind_along items.
+
+# --- Item lists per index (raw variable names in C2TB_stfu_wins) ---
+mech_items <- list(
+  optimistic_future      = c("future_relative_ses", "child_aspirations",
+                             "future_life_sat"),
+  social_worth =           c("worth_family", "worth_community",
+                             "worth_famresp", "worth_comresp",
+                             "relative_ses"),   # 4 "worth" items + MacArthur ladder
+  self_efficacy          = c("eff_solveprob_hard", "eff_opposes", "eff_accomgoal",
+                             "eff_confident", "eff_resourceful",
+                             "eff_solveprob_tryhard", "eff_remaincalm",
+                             "eff_confrontprob", "eff_trouble", "eff_handle"),
+  spousal_communication  = c("freq_disc_day", "freq_disc_worries",
+                             "freq_disc_decision", "freq_part_listens",
+                             "freq_part_thanks", "freq_part_humiliates",
+                             "freq_rslv_calmly", "freq_rslv_eachother",
+                             "freq_rslv_yelling", "freq_rslv_threats"),
+  meta_cognitive         = c("mind_calm", "mind_reflect", "mind_emotions",
+                             "mind_interact", "mind_understand", "mind_along",
+                             "goals_challenges"),
+  social_inclusion       = c("close_household", "close_spouse", "close_community",
+                             "loneliness", "social_excluded_rev_z",
+                             "harassment_rev_z"),
+  grit                   = c("grit_newidea", "grit_setback", "grit_setgoal",
+                             "grit_hardwork", "grit_focus", "grit_finishall",
+                             "grit_interest", "grit_diligent", "grit_obsessed",
+                             "grit_setbacks", "grit_achievement"),
+  self_control           = c("sc1_habits", "sc2_distracted", "sc3_inappropriate",
+                             "sc4_refuse", "sc5_resist", "sc6_selfdiscipline",
+                             "sc7_pleasure", "sc8_feelgood", "sc9_stop",
+                             "sc10_alternatives")
+)
+
+
+# --- Sanity check: every item in mech_items must exist in C2TB_stfu_wins ---
+mech_items_all     <- unique(unlist(mech_items))
+mech_items_missing <- setdiff(mech_items_all, names(C2TB_stfu_wins))
+
+if (length(mech_items_missing) > 0) {
+  cat("MISSING from C2TB_stfu_wins (", length(mech_items_missing), " item(s)):\n", sep = "")
+  cat(paste0("  - ", mech_items_missing), sep = "\n")
+  cat("\nPer-index breakdown:\n")
+  for (idx in names(mech_items)) {
+    bad <- setdiff(mech_items[[idx]], names(C2TB_stfu_wins))
+    if (length(bad) > 0) {
+      cat(sprintf("  %-22s %s\n", paste0(idx, ":"),
+                  paste(bad, collapse = ", ")))
+    }
+  }
+  stop("Fix mech_items (or add the missing columns to C2TB_stfu_wins) ",
+       "before computing alpha.")
+} else {
+  cat("All ", length(mech_items_all), " items present in C2TB_stfu_wins.\n", sep = "")
+}
+
+# --- Cronbach's alpha per entry in mech_items ---
+# `psych::alpha(..., check.keys = TRUE)` auto-reverses items whose correlation
+# with the composite is negative — matches Matt's reverse-coding of the
+# humiliation/yelling/threats, grit, self-control, and mind_along items.
+for (idx in names(mech_items)) {
+  items <- mech_items[[idx]]
+  mat   <- as.data.frame(C2TB_stfu_wins[, items, drop = FALSE])
+  mat[] <- lapply(mat, as.numeric)
+  a <- suppressMessages(suppressWarnings(
+    psych::alpha(mat, check.keys = TRUE, warnings = FALSE)
+  ))
+  cat(sprintf("%-24s alpha = %.3f   (k = %d items, n = %d complete cases)\n",
+              paste0(idx, ":"),
+              as.numeric(a$total["raw_alpha"]),
+              length(items),
+              sum(complete.cases(mat))))
+}
+
+C2TB_stfu_wins %>%
+  dplyr::select(close_household, close_spouse, close_community,
+                             loneliness) %>%
+  alpha()
+```
