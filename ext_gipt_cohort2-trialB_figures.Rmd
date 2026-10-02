@@ -1,0 +1,2386 @@
+---
+title: "G2R GIPT Backfire - Figures"
+subtitle: "Cohort 2 Trial B"
+author: "Anonymous"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  html_document:
+    code_folding: hide
+    df_print: kable
+    theme: sandstone
+    toc: true
+    toc_float: true
+    toc_depth: 4
+fontsize: 12pt
+---
+
+```{r global_setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  tidy = TRUE,
+  out.width = "95%")
+options(scipen=999)
+```
+
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(estimatr)
+library(emmeans)
+library(sjPlot)
+library(sandwich)
+library(lmtest)
+library(rio)
+library(knitr)
+library(kableExtra)
+library(broom)
+library(purrr)
+library(tibble)
+library(forcats)
+library(patchwork)
+library(ggh4x)
+library(psych)
+library(ggtext)
+```
+
+```{r helper_func, include=FALSE}
+std_to_ref <- function(x, ref, sign = 1) {
+  m  <- mean(ref, na.rm = TRUE)
+  s  <- sd(ref,   na.rm = TRUE)
+  sign * (x - m) / s
+}
+
+# 4 rows per emmeans (~ g_t | dep) object: two distress levels × two g_t levels.
+# CI only on treated bars, matching plot_heterogeneity.py::_plot_distress_community.
+matt_het_bars_emm <- function(emm, stratum) {
+  s <- as.data.frame(summary(emm, infer = TRUE))
+  tibble(
+    stratum   = stratum,
+    dep_bsl   = factor(if_else(s$dep == 1,
+                               "High baseline distress",
+                               "Low baseline distress"),
+                       levels = c("High baseline distress", "Low baseline distress")),
+    condition = factor(if_else(s$g_t == 1, "Grad + Therapy", "Grad"),
+                       levels = c("Grad", "Grad + Therapy")),
+    y         = s$emmean,
+    ci_lo     = if_else(s$g_t == 1, s$lower.CL, NA_real_),
+    ci_hi     = if_else(s$g_t == 1, s$upper.CL, NA_real_)
+  )
+}
+
+run_mech_models <- function(dvs, data,
+                            controls = c("kessler_6_bsl","female_head",
+                                         "someprimary_head", "somesecondary_head",
+                                         "hhsize", "coh1_holdout"),
+                            fe       = "c2_vil_clus_id",
+                            label    = NA_character_) {
+
+  out <- map_dfr(dvs, function(dv) {
+
+    f <- reformulate(c("g_t", controls, sprintf("factor(%s)", fe)), response = dv)
+    m <- lm_robust(f, data = data, se_type = "HC1")
+
+    row <- tidy(m) %>% filter(term == "g_t")
+
+    keep   <- complete.cases(data[c(dv, "g_t", controls, fe)])
+    sd_ref <- sd(data[[dv]][keep & data$g_t == 0], na.rm = TRUE)
+
+    tibble(
+      sample    = label,
+      dv        = dv,
+      estimate  = row$estimate,
+      se        = row$std.error,
+      ci_low    = row$conf.low,
+      ci_high   = row$conf.high,
+      p         = row$p.value,
+      N         = m$nobs,
+      sd_noGIPT = sd_ref,
+      est_sd    = row$estimate / sd_ref
+    )
+  })
+
+  out %>% mutate(p_fdr = p.adjust(p, method = "BH"), .after = p)
+}
+
+run_mech_predictors <- function(mechs, data,
+                                outcome  = "psych_distress_index",
+                                lag      = "kessler_6_bsl",
+                                controls = c("female_head", "someprimary_head",
+                                             "somesecondary_head", "hhsize", "coh1_holdout"),
+                                fe       = "c2_vil_clus_id",
+                                label    = NA_character_) {
+
+  out <- map_dfr(mechs, function(mech) {
+
+    f <- reformulate(c(mech, lag, controls, sprintf("factor(%s)", fe)),
+                     response = outcome)
+    m <- lm_robust(f, data = data, se_type = "HC1")
+
+    row <- tidy(m) %>% filter(term == mech)
+    if (nrow(row) != 1L) stop("term not found in fit: ", mech)
+
+    tibble(
+      sample   = label,
+      outcome  = outcome,
+      dv       = mech,
+      estimate = row$estimate,
+      se       = row$std.error,
+      ci_low   = row$conf.low,
+      ci_high  = row$conf.high,
+      p        = row$p.value,
+      N        = m$nobs
+    )
+  })
+
+  out %>% mutate(p_fdr = p.adjust(p, method = "BH"), .after = p)
+}
+
+# Two rows per emmeans object (control + treated). CI only on treated,
+# matching Matt's Python (`plot_panels.py::_plot_overall_panel`).
+matt_bars_emm <- function(emm, outcome, stratum) {
+  s <- as.data.frame(summary(emm, infer = TRUE))
+  tibble(
+    outcome   = outcome,
+    stratum   = stratum,
+    condition = factor(c("Grad", "Grad + Therapy"),
+                       levels = c("Grad", "Grad + Therapy")),
+    y         = c(s$emmean[s$g_t == 0], s$emmean[s$g_t == 1]),
+    ci_lo     = c(NA_real_, s$lower.CL[s$g_t == 1]),
+    ci_hi     = c(NA_real_, s$upper.CL[s$g_t == 1])
+  )
+}
+
+# Extract both bars (control + treated) from an emmeans object; CI only on
+# the Group Therapy bar (control CIs returned as NA so no whisker draws).
+emm_to_bars <- function(emm, sample, timepoint) {
+  s <- as.data.frame(summary(emm, infer = TRUE))
+  tibble(
+    sample    = sample,
+    timepoint = timepoint,
+    condition = factor(if_else(s$g_t == 1, "Group Therapy", "Control"),
+                       levels = c("Control", "Group Therapy")),
+    y         = s$emmean,
+    ci_lo     = if_else(s$g_t == 1, s$lower.CL, NA_real_),
+    ci_hi     = if_else(s$g_t == 1, s$upper.CL, NA_real_)
+  )
+}
+
+# Same shape as `emm_to_bars`, but 95% CI whiskers on BOTH bars
+# (control + treated). Use for panels where both conditions get CIs.
+# `p_te` is the p-value of the g_t == 1 minus g_t == 0 contrast, repeated
+# on both rows so it can be filtered later for a single significance sign.
+emm_to_bars_both_ci <- function(emm, sample, timepoint) {
+  s  <- as.data.frame(summary(emm, infer = TRUE))
+  ct <- contrast(emm, method = list("gipt_vs_ctrl" = c(-1, 1)))
+  te_p <- as.data.frame(summary(ct, infer = TRUE))$p.value[1]
+  tibble(
+    sample    = sample,
+    timepoint = timepoint,
+    condition = factor(if_else(s$g_t == 1, "Group Therapy", "Control"),
+                       levels = c("Control", "Group Therapy")),
+    y         = s$emmean,
+    ci_lo     = s$lower.CL,
+    ci_hi     = s$upper.CL,
+    p_te      = te_p
+  )
+}
+
+# Fit a single TE `emmeans` object for a given outcome + data slice.
+# Uses the psych-panel baseline set: `kessler_6_bsl` + household covariates
+# + village fixed effects, HC1 SEs. Convenience wrapper to keep the
+# Panel B / C / D models chunks compact.
+fit_te_emm <- function(outcome_var, data) {
+  form <- reformulate(
+    c("g_t", "kessler_6_bsl", "female_head", "someprimary_head",
+      "somesecondary_head", "hhsize", "coh1_holdout",
+      "factor(c2_vil_clus_id)"),
+    response = outcome_var
+  )
+  m <- lm_robust(form, se_type = "HC1", data = data)
+  emmeans(m, ~ g_t, at = list(g_t = c(0, 1)))
+}
+
+# Extract the g_t == 1 minus g_t == 0 contrast (treatment effect) from an
+# emmeans object, plus its 95% CI and p-value. Returns ONE row per call.
+emm_to_te <- function(emm, sample, timepoint) {
+  ct <- contrast(emm, method = list("gipt_vs_ctrl" = c(-1, 1)))
+  s  <- as.data.frame(summary(ct, infer = TRUE))
+  tibble(
+    sample    = sample,
+    timepoint = timepoint,
+    y         = s$estimate,
+    ci_lo     = s$lower.CL,
+    ci_hi     = s$upper.CL,
+    p         = s$p.value
+  )
+}
+
+# Same idea as emm_to_te(), but for a g_t × dep interaction model. Assumes
+# `emm` was built with `~ g_t | dep, at = list(g_t = c(0,1), dep = c(0,1))`.
+# Returns TWO rows (one TE per baseline-distress level).
+emm_to_te_by_dep <- function(emm, sample, timepoint) {
+  ct <- contrast(emm, method = "revpairwise")
+  s  <- as.data.frame(summary(ct, infer = TRUE))
+  tibble(
+    sample    = sample,
+    timepoint = timepoint,
+    dep_bsl   = factor(if_else(s$dep == 1, "High", "Low"),
+                       levels = c("High", "Low")),
+    y         = s$estimate,
+    ci_lo     = s$lower.CL,
+    ci_hi     = s$upper.CL,
+    p         = s$p.value
+  )
+}
+
+# Significance sign for a treatment-effect p-value.
+#   p < .05 -> "*"     p < .10 -> "†" (dagger, U+2020)     otherwise -> ""
+# NB: `sig_sign()` feeds plain `geom_text()` in Figures 3/4/5, which does NOT
+# parse HTML — so the dagger has to be a raw unicode character, not
+# "<sup>†</sup>". The mechanism panels (below) that use `geom_richtext` build
+# their sig marks in a separate `stars` block and can keep the <sup> wrapping.
+sig_sign <- function(p) dplyr::case_when(
+  is.na(p) ~ "",
+  p < 0.001 ~ "***",
+  p < 0.01 ~ "**",
+  p < 0.05 ~ "*",
+  p < 0.10 ~ "†",
+  TRUE     ~ ""
+)
+
+# Strip each panel's own caption so only the shared plot_annotation caption
+# renders at the bottom of the combined figure.
+strip_caption <- function(p) p + labs(caption = NULL)
+
+# Extract 4 rows (g_t × dep) from an emmeans object plus a time-point tag.
+# `p_te` is the p-value of the g_t == 1 minus g_t == 0 contrast computed
+# WITHIN each dep level (so it differs between High and Low). Same p_te
+# on both rows within a (time_point, dep_bsl) pair so a downstream filter
+# by condition can pull one label per (time_point, dep_bsl).
+emm_to_k6_line_df <- function(emm, time_point) {
+  s <- as.data.frame(summary(emm, infer = TRUE))
+  # TE per dep level via revpairwise on g_t within each dep
+  te   <- contrast(emm, method = "revpairwise", by = "dep")
+  te_s <- as.data.frame(summary(te, infer = TRUE))
+  p_te_map <- setNames(te_s$p.value, as.character(te_s$dep))
+  tibble(
+    time_point = time_point,
+    condition  = factor(if_else(s$g_t == 1, "Group Therapy", "Control"),
+                        levels = c("Control", "Group Therapy")),
+    dep_bsl    = factor(if_else(s$dep == 1, "High", "Low"),
+                        levels = c("High", "Low")),
+    y          = s$emmean,
+    ci_lo      = s$lower.CL,
+    ci_hi      = s$upper.CL,
+    p_te       = unname(p_te_map[as.character(s$dep)])
+  )
+}
+
+# Extract 2 rows (g_t = 0, 1) from an emmeans object plus a time-point tag.
+# `p_te` is the p-value of the g_t == 1 minus g_t == 0 contrast, repeated
+# on both rows so a downstream filter by condition can pull one label
+# per time_point for the significance sign.
+emm_to_k6_line_nodep_df <- function(emm, time_point) {
+  s <- as.data.frame(summary(emm, infer = TRUE))
+  ct   <- contrast(emm, method = list("gipt_vs_ctrl" = c(-1, 1)))
+  p_te <- as.data.frame(summary(ct, infer = TRUE))$p.value[1]
+  tibble(
+    time_point = time_point,
+    condition  = factor(if_else(s$g_t == 1, "Group Therapy", "Control"),
+                        levels = c("Control", "Group Therapy")),
+    y          = s$emmean,
+    ci_lo      = s$lower.CL,
+    ci_hi      = s$upper.CL,
+    p_te       = p_te
+  )
+}
+```
+
+
+```{r import_data, include=FALSE}
+C2TB_bsl <- import("gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
+
+C2TB_stfu_wins <-
+  import("gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
+
+C2TB_enl_wins <-
+  import("gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
+```
+
+
+# Figure 3 - Treatment Effect on Psychological Distress
+## Panel A - `psych_distress_index`
+```{r fig6_panelA_models, include=FALSE}
+# Six models for panel A: psych_distress_index at 3m FU (STFU) and 20-month
+# FU (endline), in the pooled sample plus the host / refugee subsamples.
+# Specs mirror the regression Rmd:
+#   Pooled  STFU  L360-368    Pooled  Endline L682-690
+#   Host    STFU  L1014-1023  Host    Endline L1352-1361
+#   Refugee STFU  L1689-1697  Refugee Endline L2024-2033
+
+psyInd_stfu_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+psyInd_hst_stfu_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+psyInd_ref_stfu_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+psyInd_enl_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+psyInd_hst_enl_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+psyInd_ref_enl_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+psyInd_stfu_emm_rbst     <-
+  emmeans(psyInd_stfu_lm_rbst,     ~ g_t, at = list(g_t = c(0, 1)))
+psyInd_hst_stfu_emm_rbst <-
+  emmeans(psyInd_hst_stfu_lm_rbst, ~ g_t, at = list(g_t = c(0, 1)))
+psyInd_ref_stfu_emm_rbst <-
+  emmeans(psyInd_ref_stfu_lm_rbst, ~ g_t, at = list(g_t = c(0, 1)))
+psyInd_enl_emm_rbst      <-
+  emmeans(psyInd_enl_lm_rbst,      ~ g_t, at = list(g_t = c(0, 1)))
+psyInd_hst_enl_emm_rbst  <-
+  emmeans(psyInd_hst_enl_lm_rbst,  ~ g_t, at = list(g_t = c(0, 1)))
+psyInd_ref_enl_emm_rbst  <-
+  emmeans(psyInd_ref_enl_lm_rbst,  ~ g_t, at = list(g_t = c(0, 1)))
+```
+
+```{r fig6_panelA}
+# Treatment effect (g_t == 1 minus g_t == 0) per sample × timepoint, extracted
+# via contrast(emm, list(c(-1, 1))). Bars show the TE with a 95% CI whisker.
+fig6_panelA_df <- bind_rows(
+  emm_to_te(psyInd_stfu_emm_rbst,     "Pooled",  "3m FU"),
+  emm_to_te(psyInd_enl_emm_rbst,      "Pooled",  "20m FU"),
+  emm_to_te(psyInd_hst_stfu_emm_rbst, "Host",    "3m FU"),
+  emm_to_te(psyInd_hst_enl_emm_rbst,  "Host",    "20m FU"),
+  emm_to_te(psyInd_ref_stfu_emm_rbst, "Refugee", "3m FU"),
+  emm_to_te(psyInd_ref_enl_emm_rbst,  "Refugee", "20m FU")
+) %>%
+  mutate(
+    sample    = factor(sample,    levels = c("Pooled", "Host", "Refugee")),
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    # Same `bar_fill` levels as Panels B / C / D so `patchwork::plot_layout(
+    # guides = "collect")` produces one shared legend downstream.  "Control"
+    # is defined but unused in Panel A (TE plot has no control dot). Values
+    # produced by case_when MUST match the levels vector exactly, otherwise
+    # factor() coerces them to NA and the fill mapping breaks silently.
+    bar_fill  = factor(case_when(
+      timepoint == "3m FU"  ~ "Group Therapy (3m FU)",
+      timepoint == "20m FU" ~ "Group Therapy (20m FU)"
+    ),
+    levels = c("Control",
+               "Group Therapy (3m FU)",
+               "Group Therapy (20m FU)"))
+  )
+
+fig6_panelA <-
+  ggplot(fig6_panelA_df, aes(x = timepoint, y = y, fill = bar_fill)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi, color = timepoint),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  scale_y_continuous(limits = c(-.12, .22), breaks = seq(-.1, .2, .1)) +
+  facet_wrap(~ sample, ncol = 3) +
+  # `values` keys are the DATA values (bar_fill levels); `labels` re-titles
+  # them in the legend without breaking the colour mapping.
+  scale_fill_manual(
+    values = c("Control"                = "grey70",
+               "Group Therapy (3m FU)"  = "steelblue1",
+               "Group Therapy (20m FU)" = "dodgerblue4"),
+    labels = c("Control"                = "Graduation control",
+               "Group Therapy (3m FU)"  = "Group therapy (3m FU)",
+               "Group Therapy (20m FU)" = "Group therapy (20m FU)"),
+    name   = NULL,
+    drop   = FALSE  # keep the "Control" key visible in the collected legend
+  ) +
+  scale_color_manual(
+    values = c("Control"                = "grey70",
+               "Group Therapy (3m FU)"  = "steelblue1",
+               "Group Therapy (20m FU)" = "dodgerblue4"),
+    labels = c("Control"                = "Graduation control",
+               "Group Therapy (3m FU)"  = "Group therapy (3m FU)",
+               "Group Therapy (20m FU)" = "Group therapy (20m FU)"),
+    name   = NULL,
+    drop   = FALSE  # keep the "Control" key visible in the collected legend
+  ) +
+  labs(x = NULL, y = "Effect size \n(std. to Mean and SD of refugee Graduation control)",
+       title = "Psychological Distress Index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom",
+    strip.text         = element_text(face = "bold"),
+    plot.title         = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey30"),
+    plot.title.position = "plot"
+  )
+
+fig6_panelA
+```
+
+## Panel B - `kessler_10`
+
+```{r fig6_panelB_models, include=FALSE}
+# Six `kessler_10` TE models (pooled + host + refugee, STFU + endline).
+# Specs mirror the regression Rmd:
+#   Pooled  STFU  L298-306    Pooled  Endline L626-634
+#   Host    STFU  L1046-1054  Host    Endline L1384-1391
+#   Refugee STFU  L1721-1728  Refugee Endline L2056-2063
+ksl10_stfu_emm_rbst     <-
+  fit_te_emm("kessler_10", C2TB_stfu_wins)
+ksl10_hst_stfu_emm_rbst <-
+  fit_te_emm("kessler_10", C2TB_stfu_wins %>% filter(refugee == 0))
+ksl10_ref_stfu_emm_rbst <-
+  fit_te_emm("kessler_10", C2TB_stfu_wins %>% filter(refugee == 1))
+ksl10_enl_emm_rbst      <-
+  fit_te_emm("kessler_10", C2TB_enl_wins)
+ksl10_hst_enl_emm_rbst  <-
+  fit_te_emm("kessler_10", C2TB_enl_wins %>% filter(refugee == 0))
+ksl10_ref_enl_emm_rbst  <-
+  fit_te_emm("kessler_10", C2TB_enl_wins %>% filter(refugee == 1))
+```
+
+```{r fig6_panelB}
+fig6_panelB_df <- bind_rows(
+  emm_to_bars_both_ci(ksl10_stfu_emm_rbst,     "Pooled",  "3m FU"),
+  emm_to_bars_both_ci(ksl10_enl_emm_rbst,      "Pooled",  "20m FU"),
+  emm_to_bars_both_ci(ksl10_hst_stfu_emm_rbst, "Host",    "3m FU"),
+  emm_to_bars_both_ci(ksl10_hst_enl_emm_rbst,  "Host",    "20m FU"),
+  emm_to_bars_both_ci(ksl10_ref_stfu_emm_rbst, "Refugee", "3m FU"),
+  emm_to_bars_both_ci(ksl10_ref_enl_emm_rbst,  "Refugee", "20m FU")
+) %>%
+  mutate(
+    sample    = factor(sample,    levels = c("Pooled", "Host", "Refugee")),
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    bar_fill  = factor(case_when(
+      condition == "Control"     ~ "Control",
+      timepoint == "3m FU"  ~ "Group Therapy (3m FU)",
+      timepoint == "20m FU" ~ "Group Therapy (20m FU)"
+    ),
+    levels = c("Control",
+               "Group Therapy (3m FU)",
+               "Group Therapy (20m FU)"))
+  )
+
+fig6_panelB <-
+  ggplot(fig6_panelB_df,
+         aes(x = timepoint, y = y, fill = bar_fill, group = condition)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7,
+           colour = "black", linewidth = 0.4) +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                position = position_dodge(width = 0.8),
+                width = 0.18, linewidth = 0.5, colour = "black") +
+  geom_text(data = ~ dplyr::filter(.x, condition == "Group Therapy"),
+            aes(y = ci_hi, label = sig_sign(p_te)),
+            vjust = -0.5, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ sample, ncol = 3) +
+  scale_fill_manual(
+    values = c("Control"                = "grey70",
+               "Group Therapy (3m FU)"  = "steelblue1",
+               "Group Therapy (20m FU)" = "dodgerblue4"),
+    labels = c("Control"                = "Graduation control",
+               "Group Therapy (3m FU)"  = "Group therapy (3m FU)",
+               "Group Therapy (20m FU)" = "Group therapy (20m FU)"),
+    name = NULL
+  ) +
+  scale_y_continuous(limits = c(0,16), breaks = seq(0,16,4)) +
+  labs(x = NULL, y = "Score range: 0 - 40",
+       title = "Symptoms of Psychological Distress (Kessler-10)") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom",
+    strip.text         = element_blank(),
+    plot.title         = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey30"),
+    plot.title.position = "plot"
+  )
+
+fig6_panelB
+```
+
+## Panel C - `PHQ_total_score`
+
+```{r fig6_panelC_models, include=FALSE}
+# Six `phq_total_score` TE models (pooled + host + refugee, STFU + endline).
+# Specs mirror the regression Rmd:
+#   Pooled  STFU  L316-324    Pooled  Endline L640-648
+#   Host    STFU  L1107-1115  Host    Endline L1444-1451
+#   Refugee STFU  L1781-1788  Refugee Endline L2116-2124
+phq_stfu_emm_rbst     <- fit_te_emm("phq_total_score", C2TB_stfu_wins)
+phq_hst_stfu_emm_rbst <- fit_te_emm("phq_total_score", C2TB_stfu_wins %>% filter(refugee == 0))
+phq_ref_stfu_emm_rbst <- fit_te_emm("phq_total_score", C2TB_stfu_wins %>% filter(refugee == 1))
+phq_enl_emm_rbst      <- fit_te_emm("phq_total_score", C2TB_enl_wins)
+phq_hst_enl_emm_rbst  <- fit_te_emm("phq_total_score", C2TB_enl_wins %>% filter(refugee == 0))
+phq_ref_enl_emm_rbst  <- fit_te_emm("phq_total_score", C2TB_enl_wins %>% filter(refugee == 1))
+```
+
+```{r fig6_panelC}
+fig6_panelC_df <- bind_rows(
+  emm_to_bars_both_ci(phq_stfu_emm_rbst,     "Pooled",  "3m FU"),
+  emm_to_bars_both_ci(phq_enl_emm_rbst,      "Pooled",  "20m FU"),
+  emm_to_bars_both_ci(phq_hst_stfu_emm_rbst, "Host",    "3m FU"),
+  emm_to_bars_both_ci(phq_hst_enl_emm_rbst,  "Host",    "20m FU"),
+  emm_to_bars_both_ci(phq_ref_stfu_emm_rbst, "Refugee", "3m FU"),
+  emm_to_bars_both_ci(phq_ref_enl_emm_rbst,  "Refugee", "20m FU")
+) %>%
+  mutate(
+    sample    = factor(sample,    levels = c("Pooled", "Host", "Refugee")),
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    bar_fill  = factor(case_when(
+      condition == "Control"     ~ "Control",
+      timepoint == "3m FU"  ~ "Group Therapy (3m FU)",
+      timepoint == "20m FU" ~ "Group Therapy (20m FU)"
+    ),
+    levels = c("Control",
+               "Group Therapy (3m FU)",
+               "Group Therapy (20m FU)"))
+  )
+
+fig6_panelC <-
+  ggplot(fig6_panelC_df,
+         aes(x = timepoint, y = y, fill = bar_fill, group = condition)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7,
+           colour = "black", linewidth = 0.4) +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                position = position_dodge(width = 0.8),
+                width = 0.18, linewidth = 0.5, colour = "black") +
+  geom_text(data = ~ dplyr::filter(.x, condition == "Group Therapy"),
+            aes(y = ci_hi, label = sig_sign(p_te)),
+            vjust = -0.5, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ sample, ncol = 3) +
+  scale_y_continuous(breaks = c(0, 3, 6, 9)) +
+  coord_cartesian(ylim = c(0, 9)) +
+  scale_fill_manual(
+    values = c("Control"                = "grey70",
+               "Group Therapy (3m FU)"  = "steelblue1",
+               "Group Therapy (20m FU)" = "dodgerblue4"),
+    labels = c("Control"                = "Graduation control",
+               "Group Therapy (3m FU)"  = "Group therapy (3m FU)",
+               "Group Therapy (20m FU)" = "Group therapy (20m FU)"),
+    name = NULL
+  ) +
+  labs(x = NULL, y = "Score range: 0 - 27",
+       title = "Depressive Symptoms (PHQ-9)") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom",
+    strip.text         = element_blank(),
+    plot.title         = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey30"),
+    plot.title.position = "plot"
+  )
+
+fig6_panelC
+```
+
+## Panel D - `GAD_total_score`
+
+```{r fig6_panelD_models, include=FALSE}
+# Six `gad_total_score` TE models (pooled + host + refugee, STFU + endline).
+# Specs mirror the regression Rmd:
+#   Pooled  STFU  L324-332    Pooled  Endline L647-655
+#   Host    STFU  L1138-1146  Host    Endline L1474-1481
+#   Refugee STFU  L1811-1818  Refugee Endline L2147-2155
+gad_stfu_emm_rbst     <- fit_te_emm("gad_total_score", C2TB_stfu_wins)
+gad_hst_stfu_emm_rbst <- fit_te_emm("gad_total_score", C2TB_stfu_wins %>% filter(refugee == 0))
+gad_ref_stfu_emm_rbst <- fit_te_emm("gad_total_score", C2TB_stfu_wins %>% filter(refugee == 1))
+gad_enl_emm_rbst      <- fit_te_emm("gad_total_score", C2TB_enl_wins)
+gad_hst_enl_emm_rbst  <- fit_te_emm("gad_total_score", C2TB_enl_wins %>% filter(refugee == 0))
+gad_ref_enl_emm_rbst  <- fit_te_emm("gad_total_score", C2TB_enl_wins %>% filter(refugee == 1))
+```
+
+```{r fig6_panelD}
+fig6_panelD_df <- bind_rows(
+  emm_to_bars_both_ci(gad_stfu_emm_rbst,     "Pooled",  "3m FU"),
+  emm_to_bars_both_ci(gad_enl_emm_rbst,      "Pooled",  "20m FU"),
+  emm_to_bars_both_ci(gad_hst_stfu_emm_rbst, "Host",    "3m FU"),
+  emm_to_bars_both_ci(gad_hst_enl_emm_rbst,  "Host",    "20m FU"),
+  emm_to_bars_both_ci(gad_ref_stfu_emm_rbst, "Refugee", "3m FU"),
+  emm_to_bars_both_ci(gad_ref_enl_emm_rbst,  "Refugee", "20m FU")
+) %>%
+  mutate(
+    sample    = factor(sample,    levels = c("Pooled", "Host", "Refugee")),
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    bar_fill  = factor(case_when(
+      condition == "Control"     ~ "Control",
+      timepoint == "3m FU"  ~ "Group Therapy (3m FU)",
+      timepoint == "20m FU" ~ "Group Therapy (20m FU)"
+    ),
+    levels = c("Control",
+               "Group Therapy (3m FU)",
+               "Group Therapy (20m FU)"))
+  )
+
+fig6_panelD <-
+  ggplot(fig6_panelD_df,
+         aes(x = timepoint, y = y, fill = bar_fill, group = condition)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7,
+           colour = "black", linewidth = 0.4) +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                position = position_dodge(width = 0.8),
+                width = 0.18, linewidth = 0.5, colour = "black") +
+  geom_text(data = ~ dplyr::filter(.x, condition == "Group Therapy"),
+            aes(y = ci_hi, label = sig_sign(p_te)),
+            vjust = -0.5, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ sample, ncol = 3) +
+  scale_fill_manual(
+    values = c("Control"                = "grey70",
+               "Group Therapy (3m FU)"  = "steelblue1",
+               "Group Therapy (20m FU)" = "dodgerblue4"),
+    labels = c("Control"                = "Graduation control",
+               "Group Therapy (3m FU)"  = "Group therapy (3m FU)",
+               "Group Therapy (20m FU)" = "Group therapy (20m FU)"),
+    name = NULL
+  ) +
+  scale_y_continuous(limits = c(0,8), breaks = seq(0,8,2)) +
+  labs(x = NULL, y = "Score range: 0 - 21",
+       title = "Anxiety Symptoms (GAD-7)") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom",
+    strip.text         = element_blank(),
+    plot.title         = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey30"),
+    plot.title.position = "plot"
+  )
+
+fig6_panelD
+```
+
+## Stacked Figure
+
+```{r fig6_stacked}
+fig6 <-
+  ((strip_caption(fig6_panelA) + guides(fill = "none")) /
+   strip_caption(fig6_panelB) /
+   strip_caption(fig6_panelC) /
+   strip_caption(fig6_panelD)) +
+  plot_layout(guides = "collect") &
+  theme(legend.position   = "right",
+        # compact the legend so the plot area itself gets more width
+        legend.key.size   = unit(0.9, "lines"),
+        legend.text       = element_text(size = 9),
+        legend.margin     = margin(0, 0, 0, 0),
+        legend.box.margin = margin(0, 0, 0, 0),
+        legend.spacing.y  = unit(0.15, "lines"),
+        # Extra vertical padding between stacked panels (bump `t`/`b` to widen).
+        plot.margin       = margin(t = 8, r = 4, b = 8, l = 4, unit = "pt"))
+
+fig6
+```
+
+# Figure 4 - Treatment Effect on Primary Outcomes
+
+## psych_distress_index
+
+### Hosts: overall and by baseline distress level
+```{r fig6_distress_host_models, include = FALSE}
+# Distress g_t*dep interaction host models. Main-effect host models
+# (psyInd_hst_stfu_lm_rbst / psyInd_hst_enl_lm_rbst) already exist from
+# fig6_panelA_models above — reused directly in the plot chunks below.
+psyInd_dep_hst_stfu_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+psyInd_dep_hst_enl_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+psyInd_dep_hst_stfu_emm_rbst <-
+  emmeans(psyInd_dep_hst_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+psyInd_dep_hst_enl_emm_rbst  <-
+  emmeans(psyInd_dep_hst_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_distress_host}
+fig6_distress_host_df <- bind_rows(
+  emm_to_te(psyInd_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(psyInd_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(psyInd_dep_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(psyInd_dep_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("Averaged effect",
+                                  "Higher baseline distress",
+                                  "Lower baseline distress"))
+  )
+
+fig6_distress_host <-
+  ggplot(fig6_distress_host_df, aes(x = timepoint, y = y,
+                                     fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  scale_y_continuous(limits = c(-.14, .35), breaks = seq(-.1,.3,.1)) +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = "Effect size \n(std. to Mean and SD of refugee Graduation control)",
+       title = "Hosts: treatment effect on psychological distress index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_distress_host
+```
+
+### Refugees: overall and by baseline distress level
+```{r fig6_distress_ref_models, include = FALSE}
+psyInd_dep_ref_stfu_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+psyInd_dep_ref_enl_lm_rbst <-
+  lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+psyInd_dep_ref_stfu_emm_rbst <-
+  emmeans(psyInd_dep_ref_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+psyInd_dep_ref_enl_emm_rbst  <-
+  emmeans(psyInd_dep_ref_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_distress_ref}
+fig6_distress_ref_df <- bind_rows(
+  emm_to_te(psyInd_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(psyInd_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(psyInd_dep_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(psyInd_dep_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("Average effect",
+                                  "Higher baseline distress",
+                                  "Lower baseline distress"))
+  )
+
+fig6_distress_ref <-
+  ggplot(fig6_distress_ref_df, aes(x = timepoint, y = y,
+                                    fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = NULL,
+       title = "Refugees: treatment effect on psychological distress index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_distress_ref
+```
+
+## econ_activity_index
+### Hosts: overall and by baseline distress level
+```{r fig6_host_models, include = FALSE}
+# Four host models for econ_activity_index:
+#   - Plain g_t (STFU + endline)      -> "Overall" TE per timepoint
+#   - g_t × dep (STFU + endline)      -> "High" and "Low" TE per timepoint
+# Same covariates and SEs as the regression Rmd host specs.
+
+# ─── Plain g_t (Overall) ───
+econInd_hst_stfu_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+econInd_hst_enl_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+# ─── g_t × dep (by baseline distress) ───
+econInd_dep_hst_stfu_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+econInd_dep_hst_enl_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+econInd_hst_stfu_emm_rbst <- emmeans(econInd_hst_stfu_lm_rbst,
+                                     ~ g_t, at = list(g_t = c(0, 1)))
+econInd_hst_enl_emm_rbst  <- emmeans(econInd_hst_enl_lm_rbst,
+                                     ~ g_t, at = list(g_t = c(0, 1)))
+
+econInd_dep_hst_stfu_emm_rbst <-
+  emmeans(econInd_dep_hst_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+econInd_dep_hst_enl_emm_rbst  <-
+  emmeans(econInd_dep_hst_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_host}
+# Build host TE df with 3 sub-facets: Overall / Higher / Lower baseline distress
+fig6_host_df <- bind_rows(
+  emm_to_te(econInd_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(econInd_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(econInd_dep_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(econInd_dep_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_host <-
+  ggplot(fig6_host_df, aes(x = timepoint, y = y,
+                           fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = "Effect size \n(std. to Mean and SD of refugee Graduation control)",
+       title = "Hosts: treatment effect on economic activity index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_host
+```
+
+### Refugees: overall and by baseline distress level
+```{r fig6_ref_models, include = FALSE}
+# Four refugee models for econ_activity_index, mirroring the host block above.
+
+# ─── Plain g_t (Overall) ───
+econInd_ref_stfu_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+econInd_ref_enl_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+# ─── g_t × dep (by baseline distress) ───
+econInd_dep_ref_stfu_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+econInd_dep_ref_enl_lm_rbst <-
+  lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+econInd_ref_stfu_emm_rbst <- emmeans(econInd_ref_stfu_lm_rbst,
+                                     ~ g_t, at = list(g_t = c(0, 1)))
+econInd_ref_enl_emm_rbst  <- emmeans(econInd_ref_enl_lm_rbst,
+                                     ~ g_t, at = list(g_t = c(0, 1)))
+
+econInd_dep_ref_stfu_emm_rbst <-
+  emmeans(econInd_dep_ref_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+econInd_dep_ref_enl_emm_rbst  <-
+  emmeans(econInd_dep_ref_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_ref}
+fig6_ref_df <- bind_rows(
+  emm_to_te(econInd_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(econInd_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(econInd_dep_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(econInd_dep_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_ref <-
+  ggplot(fig6_ref_df, aes(x = timepoint, y = y,
+                          fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = NULL,
+       title = "Refugees: treatment effect on economic activity index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_ref
+```
+
+
+
+## psych_well_being_z
+### Hosts: overall and by baseline distress level
+```{r fig6_host_models, include = FALSE}
+# Four host models for psych_well_being_z:
+#   - Plain g_t (STFU + endline)      -> "Overall" TE per timepoint
+#   - g_t × dep (STFU + endline)      -> "High" and "Low" TE per timepoint
+# Same covariates and SEs as the wellbeing regression Rmd host specs
+# (cantrils_bsl as the baseline control).
+
+# ─── Plain g_t (Overall) ───
+psyWB_hst_stfu_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+psyWB_hst_enl_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+# ─── g_t × dep (by baseline distress) ───
+psyWB_dep_hst_stfu_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+psyWB_dep_hst_enl_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+psyWB_hst_stfu_emm_rbst <- emmeans(psyWB_hst_stfu_lm_rbst,
+                                    ~ g_t, at = list(g_t = c(0, 1)))
+psyWB_hst_enl_emm_rbst  <- emmeans(psyWB_hst_enl_lm_rbst,
+                                    ~ g_t, at = list(g_t = c(0, 1)))
+
+psyWB_dep_hst_stfu_emm_rbst <-
+  emmeans(psyWB_dep_hst_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+psyWB_dep_hst_enl_emm_rbst  <-
+  emmeans(psyWB_dep_hst_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_host}
+# Build host TE df with 3 sub-facets: Overall / High / Low baseline distress
+fig6_host_df <- bind_rows(
+  emm_to_te(psyWB_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(psyWB_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(psyWB_dep_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(psyWB_dep_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_host <-
+  ggplot(fig6_host_df, aes(x = timepoint, y = y,
+                           fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = "Effect size \n(std. to Mean and SD of refugee Graduation control)",
+       title = "Hosts: treatment effect on psychological well-being index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_host
+```
+
+### Refugees: overall and by baseline distress level
+```{r fig6_ref_models, include = FALSE}
+# Four refugee models for psych_well_being_z, mirroring the host block above.
+
+# ─── Plain g_t (Overall) ───
+psyWB_ref_stfu_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+psyWB_ref_enl_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+# ─── g_t × dep (by baseline distress) ───
+psyWB_dep_ref_stfu_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+psyWB_dep_ref_enl_lm_rbst <-
+  lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+psyWB_ref_stfu_emm_rbst <- emmeans(psyWB_ref_stfu_lm_rbst,
+                                    ~ g_t, at = list(g_t = c(0, 1)))
+psyWB_ref_enl_emm_rbst  <- emmeans(psyWB_ref_enl_lm_rbst,
+                                    ~ g_t, at = list(g_t = c(0, 1)))
+
+psyWB_dep_ref_stfu_emm_rbst <-
+  emmeans(psyWB_dep_ref_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+psyWB_dep_ref_enl_emm_rbst  <-
+  emmeans(psyWB_dep_ref_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_ref}
+fig6_ref_df <- bind_rows(
+  emm_to_te(psyWB_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(psyWB_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(psyWB_dep_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(psyWB_dep_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_ref <-
+  ggplot(fig6_ref_df, aes(x = timepoint, y = y,
+                          fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1",
+               "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = NULL,
+       title = "Refugees: treatment effect on psychological well-being index") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_ref
+```
+
+## FCS
+### Hosts: overall and by baseline distress level
+```{r fig6_fcs_host_models, include = FALSE}
+# Four host FCS models: plain g_t (STFU + endline) for "Overall" TE, plus
+# g_t*dep (STFU + endline) for "High" / "Low" TE. Baseline covariate is
+# `fcs_bsl` (mirroring the FCS regression Rmd specs).
+
+fcs_hst_stfu_lm_rbst <-
+  lm_robust(fcs ~ g_t + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+fcs_hst_enl_lm_rbst <-
+  lm_robust(fcs ~ g_t + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+fcs_dep_hst_stfu_lm_rbst <-
+  lm_robust(fcs ~ g_t*dep + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+fcs_dep_hst_enl_lm_rbst <-
+  lm_robust(fcs ~ g_t*dep + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+fcs_hst_stfu_emm_rbst <- emmeans(fcs_hst_stfu_lm_rbst,
+                                  ~ g_t, at = list(g_t = c(0, 1)))
+fcs_hst_enl_emm_rbst  <- emmeans(fcs_hst_enl_lm_rbst,
+                                  ~ g_t, at = list(g_t = c(0, 1)))
+
+fcs_dep_hst_stfu_emm_rbst <-
+  emmeans(fcs_dep_hst_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+fcs_dep_hst_enl_emm_rbst  <-
+  emmeans(fcs_dep_hst_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_fcs_host}
+fig6_fcs_host_df <- bind_rows(
+  emm_to_te(fcs_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(fcs_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(fcs_dep_hst_stfu_emm_rbst, "Host", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(fcs_dep_hst_enl_emm_rbst,  "Host", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_fcs_host <-
+  ggplot(fig6_fcs_host_df, aes(x = timepoint, y = y,
+                                fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = "Effect size \n(std. to Mean and SD of refugee Graduation control)",
+       title = "Hosts: treatment effect on food consumption score") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 9, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_fcs_host
+```
+
+### Refugees: overall and by baseline distress level
+```{r fig6_fcs_ref_models, include = FALSE}
+# Refugee FCS models mirroring the host block.
+
+fcs_ref_stfu_lm_rbst <-
+  lm_robust(fcs ~ g_t + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+fcs_ref_enl_lm_rbst <-
+  lm_robust(fcs ~ g_t + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+fcs_dep_ref_stfu_lm_rbst <-
+  lm_robust(fcs ~ g_t*dep + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+fcs_dep_ref_enl_lm_rbst <-
+  lm_robust(fcs ~ g_t*dep + fcs_bsl +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+fcs_ref_stfu_emm_rbst <- emmeans(fcs_ref_stfu_lm_rbst,
+                                  ~ g_t, at = list(g_t = c(0, 1)))
+fcs_ref_enl_emm_rbst  <- emmeans(fcs_ref_enl_lm_rbst,
+                                  ~ g_t, at = list(g_t = c(0, 1)))
+
+fcs_dep_ref_stfu_emm_rbst <-
+  emmeans(fcs_dep_ref_stfu_lm_rbst, ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+fcs_dep_ref_enl_emm_rbst  <-
+  emmeans(fcs_dep_ref_enl_lm_rbst,  ~ g_t | dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+```
+
+```{r fig6_fcs_ref}
+fig6_fcs_ref_df <- bind_rows(
+  emm_to_te(fcs_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te(fcs_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = "Overall"),
+  emm_to_te_by_dep(fcs_dep_ref_stfu_emm_rbst, "Refugee", "3m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl),
+  emm_to_te_by_dep(fcs_dep_ref_enl_emm_rbst,  "Refugee", "20m FU") %>%
+    mutate(distress = as.character(dep_bsl)) %>% select(-dep_bsl)
+) %>%
+  mutate(
+    timepoint = factor(timepoint, levels = c("3m FU", "20m FU")),
+    distress  = factor(distress,
+                       levels = c("Overall", "High", "Low"),
+                       labels = c("averaged effect",
+                                  "high baseline level",
+                                  "low baseline level"))
+  )
+
+fig6_fcs_ref <-
+  ggplot(fig6_fcs_ref_df, aes(x = timepoint, y = y,
+                               fill = timepoint, color = timepoint)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, colour = "grey40") +
+  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi),
+                width = 0.15, linewidth = 0.6) +
+  geom_point(shape = 21, size = 3.5, stroke = 0.4, colour = "black") +
+  geom_text(aes(y = ci_hi, label = sig_sign(p)),
+            vjust = -0.6, size = 5, colour = "black", show.legend = FALSE) +
+  facet_wrap(~ distress, ncol = 3) +
+  scale_fill_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  scale_color_manual(
+    values = c("3m FU"  = "steelblue1", "20m FU" = "dodgerblue4"),
+    name   = NULL
+  ) +
+  labs(x = NULL, y = NULL,
+       title = "Refugees: treatment effect on food consumption score") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    axis.title.y       = element_text(size = 10, colour = "grey20"),
+    plot.title.position = "plot"
+  )
+
+fig6_fcs_ref
+```
+
+## Stacked Figure
+
+```{r fig6_stacked}
+# 3 x 2 grid: three outcome rows (distress, well-being, econ) x two sample
+# columns (Hosts | Refugees). Each cell is a full panel with three facets:
+# averaged effect, high baseline distress, low baseline distress.
+#
+# Column headers "Hosts" / "Refugees" sit above the top row. Facet strips
+# (averaged / high / low) are kept on the TOP row (distress) only so they
+# aren't repeated for wellbeing and econ below. Each panel's own title
+# (e.g. "Hosts: treatment effect on ...") is suppressed since the column
+# header + facet strips + per-panel y-axis label already identify it.
+# User-edited y-axis labels are preserved on every cell.
+#
+# FCS panels (fig6_fcs_host / fig6_fcs_ref) and fcs_ylim are still defined
+# above and callable on their own, but intentionally excluded from this
+# stacked composition.
+
+# Force both host and refugee cells in the same outcome row to share the SAME
+# y-axis: the outer `coord_cartesian` sets the visible range; the inner
+# `scale_y_continuous` overrides any hard-coded scale_y_continuous inside the
+# individual panels (e.g. fig6_distress_host has one) so tick marks match too.
+# `suppressMessages` silences ggplot's "Scale for y is already present" note
+# from the intentional replacement.
+apply_ylim <- function(p, ylim, breaks = waiver()) {
+  suppressMessages(
+    p + scale_y_continuous(breaks = breaks) +
+        coord_cartesian(ylim = ylim)
+  )
+}
+strip_off  <- function(p) p + theme(strip.text = element_blank())
+
+# Column-header helper: a small ggplot with centered bold text.
+col_header <- function(txt) {
+  ggplot() +
+    annotate("text", x = 0.5, y = 0.5, label = txt,
+             hjust = 0.5, vjust = 0.5, fontface = "bold", size = 6) +
+    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    theme_void() +
+    theme(plot.margin = margin(t = 4, b = 0, l = 0, r = 0, unit = "pt"))
+}
+
+hosts_col_hdr    <- col_header("Hosts")
+refugees_col_hdr <- col_header("Refugees")
+
+# Row-header helper: left-aligned bold text, spans BOTH columns via the layout
+# design string below (so hosts and refugees share the same outcome label).
+row_header <- function(txt) {
+  ggplot() +
+    annotate("text", x = 0, y = 0.5, label = txt,
+             hjust = 0, vjust = 0.5, fontface = "bold", size = 5.4) +
+    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    theme_void() +
+    theme(plot.margin = margin(t = 6, b = 2, l = 6, r = 0, unit = "pt"))
+}
+
+distress_row_hdr  <- row_header("Psychological distress index")
+wellbeing_row_hdr <- row_header("Psychological well-being index")
+econ_row_hdr      <- row_header("Economic activity index")
+
+# ─── Shared y-axis within each outcome row ───
+distress_ylim <- {
+  ys <- c(fig6_distress_host_df$ci_lo, fig6_distress_host_df$ci_hi,
+          fig6_distress_ref_df$ci_lo,  fig6_distress_ref_df$ci_hi)
+  r  <- range(ys, na.rm = TRUE)
+  # Extra top-side headroom so the sig sign sits above the tallest errorbar.
+  r + c(-0.08, 0.18) * diff(r)
+}
+wellbeing_ylim <- {
+  ys <- c(fig6_host_df$ci_lo, fig6_host_df$ci_hi,
+          fig6_ref_df$ci_lo,  fig6_ref_df$ci_hi)
+  r  <- range(ys, na.rm = TRUE)
+  r + c(-1, 1) * 0.08 * diff(r)
+}
+econ_ylim <- {
+  ys <- c(fig6_host_df$ci_lo, fig6_host_df$ci_hi,
+          fig6_ref_df$ci_lo,  fig6_ref_df$ci_hi)
+  r  <- range(ys, na.rm = TRUE)
+  r + c(-1, 1) * 0.08 * diff(r)
+}
+# Kept in case FCS is re-added to the stack later.
+fcs_ylim <- {
+  ys <- c(fig6_fcs_host_df$ci_lo, fig6_fcs_host_df$ci_hi,
+          fig6_fcs_ref_df$ci_lo,  fig6_fcs_ref_df$ci_hi)
+  r  <- range(ys, na.rm = TRUE)
+  r + c(-0.08, 0.18) * diff(r)
+}
+
+# Drop each panel's own title (column headers now identify Host / Refugee).
+# Everything else — user-edited y-axis labels, facet strips (unless stripped),
+# scales — is preserved.
+no_title <- function(p) p + labs(title = NULL) +
+  theme(plot.title = element_blank())
+
+# Compute one set of pretty breaks per outcome row so host and refugee share
+# identical tick marks (not just an identical visible range).
+distress_breaks  <- pretty(distress_ylim,  n = 5)
+wellbeing_breaks <- pretty(wellbeing_ylim, n = 5)
+econ_breaks      <- pretty(econ_ylim,      n = 5)
+
+# ─── Six cells: 3 outcomes x 2 samples ───
+# Row 1 (distress) keeps facet strips on BOTH columns. Rows 2 & 3 strip them
+# so the "averaged / high / low" labels aren't repeated three times.
+# Each row passes the same (ylim, breaks) to both host and refugee cells so
+# their y-axes are byte-identical.
+distress_hst_cell  <- apply_ylim(no_title(fig6_distress_host),   distress_ylim,  distress_breaks)
+distress_ref_cell  <- apply_ylim(no_title(fig6_distress_ref),    distress_ylim,  distress_breaks)
+
+wellbeing_hst_cell <- apply_ylim(no_title(strip_off(fig6_host)), wellbeing_ylim, wellbeing_breaks)
+wellbeing_ref_cell <- apply_ylim(no_title(strip_off(fig6_ref)),  wellbeing_ylim, wellbeing_breaks)
+
+econ_hst_cell      <- apply_ylim(no_title(strip_off(fig6_host)), econ_ylim,      econ_breaks)
+econ_ref_cell      <- apply_ylim(no_title(strip_off(fig6_ref)),  econ_ylim,      econ_breaks)
+
+# ─── Compose: 7-row layout with per-outcome row headers spanning both cols ───
+# `design` uses one letter per plot; repeated letters across cells make that
+# plot span. Order of plot objects added below MUST match A..K in the design.
+#
+#   AB  hosts_col_hdr | refugees_col_hdr
+#   CC  distress outcome label (spans both cols)
+#   DE  distress cells (host | refugee)
+#   FF  wellbeing outcome label
+#   GH  wellbeing cells
+#   II  econ outcome label
+#   JK  econ cells
+fig6_design <- "
+AB
+CC
+DE
+FF
+GH
+II
+JK
+"
+
+fig6 <-
+  (hosts_col_hdr      + refugees_col_hdr    +   # A, B
+   distress_row_hdr   +                          # C
+   distress_hst_cell  + distress_ref_cell   +   # D, E
+   wellbeing_row_hdr  +                          # F
+   wellbeing_hst_cell + wellbeing_ref_cell  +   # G, H
+   econ_row_hdr       +                          # I
+   econ_hst_cell      + econ_ref_cell) +        # J, K
+  plot_layout(design  = fig6_design,
+              guides  = "collect",
+              heights = c(0.10, 0.08, 1,
+                                0.08, 1,
+                                0.08, 1)) &
+  theme(legend.position = "bottom")
+
+fig6
+```
+
+
+
+# Figure 5 - Kessler 6 timeline
+
+Adjusting `kessler_6_bsl` at sub-sample mean
+
+```{r fig5gc_centering}
+# Group-mean centering of `kessler_6_bsl` used by both the hosts and refugees
+# model chunks below. Two centered versions are added:
+#   * `kessler_6_bsl_ref_gc`    — centered within refugee status (used by the
+#                                  pooled-across-distress models).
+#   * `kessler_6_bsl_refDep_gc` — centered within refugee × dep cell (used by
+#                                  the by-baseline-distress interaction models).
+# Both centerings are applied to STFU and endline datasets.
+
+C2TB_stfu_wins <-
+  C2TB_stfu_wins %>%
+  group_by(refugee) %>%
+  mutate(kessler_6_bsl_ref_gc = kessler_6_bsl - mean(kessler_6_bsl, na.rm = TRUE)) %>%
+  ungroup() %>%
+  group_by(refugee, dep) %>%
+  mutate(kessler_6_bsl_refDep_gc = kessler_6_bsl - mean(kessler_6_bsl, na.rm = TRUE)) %>%
+  ungroup()
+
+C2TB_enl_wins <-
+  C2TB_enl_wins %>%
+  group_by(refugee) %>%
+  mutate(kessler_6_bsl_ref_gc = kessler_6_bsl - mean(kessler_6_bsl, na.rm = TRUE)) %>%
+  ungroup() %>%
+  group_by(refugee, dep) %>%
+  mutate(kessler_6_bsl_refDep_gc = kessler_6_bsl - mean(kessler_6_bsl, na.rm = TRUE)) %>%
+  ungroup()
+```
+
+## Hosts: overall and by baseline distress level
+
+Pooled-across-distress models adjust for `kessler_6_bsl` at the host mean
+(`kessler_6_bsl_ref_gc = 0`). By-baseline-distress interaction models adjust
+for `kessler_6_bsl` at the host × dep cell mean (`kessler_6_bsl_refDep_gc = 0`).
+
+```{r fig5gc_host_models}
+# ─── Hosts, pooled across distress ─────────────────────────────────────────
+ksl6_hst_bsl_lm_brst <-
+  lm_robust(kessler_6_bsl ~ g_t + female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_bsl %>% filter(refugee == 0))
+
+ksl6_hst_stfu_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t + kessler_6_bsl_ref_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+ksl6_hst_enl_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t + kessler_6_bsl_ref_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+# ─── Hosts, by baseline distress ───────────────────────────────────────────
+ksl6_dep_hst_bsl_lm_brst <-
+  lm_robust(kessler_6_bsl ~ g_t*dep + female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_bsl %>% filter(refugee == 0))
+
+ksl6_dep_hst_stfu_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t*dep + kessler_6_bsl_refDep_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+ksl6_dep_hst_enl_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t*dep + kessler_6_bsl_refDep_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+# ─── Emmeans ───────────────────────────────────────────────────────────────
+ksl6_hst_bsl_emm_brst    <-
+  emmeans(ksl6_hst_bsl_lm_brst,    ~ g_t,
+          at = list(g_t = c(0, 1)))
+ksl6_hst_stfu_emm_brst2  <-
+  emmeans(ksl6_hst_stfu_lm_brst2,  ~ g_t,
+          at = list(g_t = c(0, 1), kessler_6_bsl_ref_gc = 0))
+ksl6_hst_enl_emm_brst2   <-
+  emmeans(ksl6_hst_enl_lm_brst2,   ~ g_t,
+          at = list(g_t = c(0, 1), kessler_6_bsl_ref_gc = 0))
+
+ksl6_dep_hst_bsl_emm_brst   <-
+  emmeans(ksl6_dep_hst_bsl_lm_brst,   ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+ksl6_dep_hst_stfu_emm_brst2 <-
+  emmeans(ksl6_dep_hst_stfu_lm_brst2, ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1),
+                    kessler_6_bsl_refDep_gc = 0))
+ksl6_dep_hst_enl_emm_brst2  <-
+  emmeans(ksl6_dep_hst_enl_lm_brst2,  ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1),
+                    kessler_6_bsl_refDep_gc = 0))
+```
+
+```{r fig5gc_host}
+# Assemble the host-only long dataframe used by both the standalone host
+# plot below AND the stacked (1 × 4) figure further down.
+fig5_host_df <- bind_rows(
+  # pooled across distress
+  emm_to_k6_line_nodep_df(ksl6_hst_bsl_emm_brst,   "Baseline")    %>%
+    mutate(distress = "Pooled"),
+  emm_to_k6_line_nodep_df(ksl6_hst_stfu_emm_brst2, "3m FU")  %>%
+    mutate(distress = "Pooled"),
+  emm_to_k6_line_nodep_df(ksl6_hst_enl_emm_brst2,  "20m FU") %>%
+    mutate(distress = "Pooled"),
+  # by baseline distress
+  emm_to_k6_line_df(ksl6_dep_hst_bsl_emm_brst,     "Baseline")    %>%
+    mutate(distress = as.character(dep_bsl)),
+  emm_to_k6_line_df(ksl6_dep_hst_stfu_emm_brst2,   "3m FU")  %>%
+    mutate(distress = as.character(dep_bsl)),
+  emm_to_k6_line_df(ksl6_dep_hst_enl_emm_brst2,    "20m FU") %>%
+    mutate(distress = as.character(dep_bsl))
+) %>%
+  mutate(
+    sample     = "Host",
+    time_point = factor(time_point,
+                        levels = c("Baseline", "3m FU", "20m FU")),
+    distress   = factor(distress, levels = c("Pooled", "High", "Low")),
+    facet      = factor(
+      if_else(distress == "Pooled",
+              "Host: pooled across distress",
+              "Host: by baseline distress"),
+      levels = c("Host: pooled across distress",
+                 "Host: by baseline distress")
+    )
+  )
+
+fig5_host_plot <-
+  ggplot(fig5_host_df,
+         aes(x = time_point, y = y,
+             colour   = condition,
+             linetype = distress,
+             group    = interaction(condition, distress))) +
+  geom_line(position = position_dodge(width = 0.15), linewidth = 0.9) +
+  geom_point(position = position_dodge(width = 0.15), size = 2.5) +
+  geom_text(aes(label = if_else(condition == "Group Therapy",
+                                sig_sign(p_te), "")),
+            position = position_dodge(width = 0.15),
+            vjust = -1.0, size = 5, colour = "black",
+            show.legend = FALSE) +
+  facet_wrap(~ facet, ncol = 2) +
+  # `values` keys must match the actual `condition` levels in the data
+  # ("Control" / "Group Therapy"). Use `labels` to change what shows in the
+  # legend without breaking the colour mapping.
+  scale_colour_manual(
+    values = c("Control"       = "grey60",
+               "Group Therapy" = "steelblue"),
+    labels = c("Control"       = "Graduation control",
+               "Group Therapy" = "Group therapy"),
+    name   = NULL
+  ) +
+  scale_linetype_manual(
+    values = c("Pooled" = "solid",
+               "High"   = "longdash",
+               "Low"    = "dotted"),
+    labels = c("Pooled" = "Average across baseline distress level",
+               "High"   = "Higher baseline distress",
+               "Low"    = "Lower baseline distress"),
+    name = NULL, drop = FALSE
+  ) +
+  labs(x = NULL, y = NULL,
+       title = "Hosts: Kessler-6 timeline") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    plot.title.position = "plot"
+  )
+
+fig5_host_plot
+```
+
+
+## Refugee: overall and by baseline distress level
+
+Pooled-across-distress models adjust for `kessler_6_bsl` at the refugee mean
+(`kessler_6_bsl_ref_gc = 0`). By-baseline-distress interaction models adjust
+for `kessler_6_bsl` at the refugee × dep cell mean (`kessler_6_bsl_refDep_gc = 0`).
+
+```{r fig5gc_ref_models}
+# ─── Refugees, pooled across distress ──────────────────────────────────────
+ksl6_ref_bsl_lm_brst <-
+  lm_robust(kessler_6_bsl ~ g_t + female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_bsl %>% filter(refugee == 1))
+
+ksl6_ref_stfu_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t + kessler_6_bsl_ref_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+ksl6_ref_enl_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t + kessler_6_bsl_ref_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+# ─── Refugees, by baseline distress ────────────────────────────────────────
+ksl6_dep_ref_bsl_lm_brst <-
+  lm_robust(kessler_6_bsl ~ g_t*dep + female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_bsl %>% filter(refugee == 1))
+
+ksl6_dep_ref_stfu_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t*dep + kessler_6_bsl_refDep_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+ksl6_dep_ref_enl_lm_brst2 <-
+  lm_robust(kessler_6 ~ g_t*dep + kessler_6_bsl_refDep_gc +
+              female_head + someprimary_head +
+              somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+# ─── Emmeans ───────────────────────────────────────────────────────────────
+ksl6_ref_bsl_emm_brst    <-
+  emmeans(ksl6_ref_bsl_lm_brst,    ~ g_t,
+          at = list(g_t = c(0, 1)))
+ksl6_ref_stfu_emm_brst2  <-
+  emmeans(ksl6_ref_stfu_lm_brst2,  ~ g_t,
+          at = list(g_t = c(0, 1), kessler_6_bsl_ref_gc = 0))
+ksl6_ref_enl_emm_brst2   <-
+  emmeans(ksl6_ref_enl_lm_brst2,   ~ g_t,
+          at = list(g_t = c(0, 1), kessler_6_bsl_ref_gc = 0))
+
+ksl6_dep_ref_bsl_emm_brst   <-
+  emmeans(ksl6_dep_ref_bsl_lm_brst,   ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+ksl6_dep_ref_stfu_emm_brst2 <-
+  emmeans(ksl6_dep_ref_stfu_lm_brst2, ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1),
+                    kessler_6_bsl_refDep_gc = 0))
+ksl6_dep_ref_enl_emm_brst2  <-
+  emmeans(ksl6_dep_ref_enl_lm_brst2,  ~ dep|g_t,
+          at = list(g_t = c(0, 1), dep = c(0, 1),
+                    kessler_6_bsl_refDep_gc = 0))
+```
+
+```{r fig5gc_ref}
+# Assemble the refugee-only long dataframe used by both the standalone
+# refugee plot below AND the stacked (1 × 4) figure further down.
+fig5_ref_df <- bind_rows(
+  # pooled across distress
+  emm_to_k6_line_nodep_df(ksl6_ref_bsl_emm_brst,   "Baseline")    %>%
+    mutate(distress = "Pooled"),
+  emm_to_k6_line_nodep_df(ksl6_ref_stfu_emm_brst2, "3m FU")  %>%
+    mutate(distress = "Pooled"),
+  emm_to_k6_line_nodep_df(ksl6_ref_enl_emm_brst2,  "20m FU") %>%
+    mutate(distress = "Pooled"),
+  # by baseline distress
+  emm_to_k6_line_df(ksl6_dep_ref_bsl_emm_brst,     "Baseline")    %>%
+    mutate(distress = as.character(dep_bsl)),
+  emm_to_k6_line_df(ksl6_dep_ref_stfu_emm_brst2,   "3m FU")  %>%
+    mutate(distress = as.character(dep_bsl)),
+  emm_to_k6_line_df(ksl6_dep_ref_enl_emm_brst2,    "20m FU") %>%
+    mutate(distress = as.character(dep_bsl))
+) %>%
+  mutate(
+    sample     = "Refugee",
+    time_point = factor(time_point,
+                        levels = c("Baseline", "3m FU", "20m FU")),
+    distress   = factor(distress, levels = c("Pooled", "High", "Low")),
+    facet      = factor(
+      if_else(distress == "Pooled",
+              "Refugee: pooled across distress",
+              "Refugee: by baseline distress"),
+      levels = c("Refugee: pooled across distress",
+                 "Refugee: by baseline distress")
+    )
+  )
+
+fig5_ref_plot <-
+  ggplot(fig5_ref_df,
+         aes(x = time_point, y = y,
+             colour   = condition,
+             linetype = distress,
+             group    = interaction(condition, distress))) +
+  geom_line(position = position_dodge(width = 0.15), linewidth = 0.9) +
+  geom_point(position = position_dodge(width = 0.15), size = 2.5) +
+  geom_text(aes(label = if_else(condition == "Group Therapy",
+                                sig_sign(p_te), "")),
+            position = position_dodge(width = 0.15),
+            vjust = -1.0, size = 5, colour = "black",
+            show.legend = FALSE) +
+  facet_wrap(~ facet, ncol = 2) +
+  # See host plot above for why `values` uses the raw data keys and `labels`
+  # holds the display strings.
+  scale_colour_manual(
+    values = c("Control"       = "grey60",
+               "Group Therapy" = "steelblue"),
+    labels = c("Control"       = "Graduation control",
+               "Group Therapy" = "Group therapy"),
+    name   = NULL
+  ) +
+  scale_linetype_manual(
+    values = c("Pooled" = "solid",
+               "High"   = "longdash",
+               "Low"    = "dotted"),
+    labels = c("Pooled" = "Average across baseline distress level",
+               "High"   = "Higher baseline distress",
+               "Low"    = "Lower baseline distress"),
+    name = NULL, drop = FALSE
+  ) +
+  labs(x = NULL, y = NULL, title = "Refugees: Kessler-6 timeline") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    legend.position     = "bottom",
+    strip.text          = element_text(face = "bold"),
+    plot.title          = element_text(face = "bold", hjust = 0),
+    plot.title.position = "plot"
+  )
+
+fig5_ref_plot
+```
+
+## Stacked figure
+```{r fig5gc_stacked, fig.width = 14, fig.height = 5}
+# 1-row layout with a visual gap between samples:
+#   Hosts (pooled | by baseline distress level)  —  Refugees (pooled | by baseline distress level)
+# Achieved via patchwork so each half carries a left-flushed "Hosts"/"Refugees"
+# header above its two facet columns; the facet strips are trimmed to just
+# "pooled" / "by baseline distress level".
+
+trim_facet <- as_labeller(function(x) {
+  x <- sub("^(Host|Refugee): ", "", x)
+  x <- sub("^pooled across distress$", "Average effect", x)
+  x <- sub("^by baseline distress$",   "By baseline distress level", x)
+  x
+})
+
+# Shared y-limits across all four panels so hosts and refugees stay comparable.
+# K6 items are 0-4 (Matt shifts the raw Likert 1-5 to 0-4 in cleaning), so the
+# K6 total ranges 0-24. Y-axis label surfaces that context.
+
+fig5_host_row <-
+  fig5_host_plot +
+  facet_wrap(~ facet, ncol = 2, labeller = trim_facet) +
+  scale_y_continuous(limits = c(1.5,12), breaks = seq(2,12,2)) +
+  labs(title = "Hosts", y = "Score range: 0 - 24") +
+  theme(plot.title          = element_text(face = "bold", hjust = 0),
+        plot.title.position = "plot",
+        axis.title.y        = element_text(size = 9, colour = "grey30"))
+
+fig5_ref_row <-
+  fig5_ref_plot +
+  facet_wrap(~ facet, ncol = 2, labeller = trim_facet) +
+  scale_y_continuous(limits = c(1.5,12), breaks = seq(2,12,2)) +
+  labs(title = "Refugees", y = "Score range: 0 - 24") +
+  theme(plot.title          = element_text(face = "bold", hjust = 0),
+        plot.title.position = "plot",
+        axis.title.y        = element_text(size = 9, colour = "grey30"))
+
+fig5gc <-
+  (fig5_host_row | plot_spacer() | fig5_ref_row) +
+  plot_layout(widths = c(2, 0.15, 2), guides = "collect") +
+  plot_annotation(
+    title = "Kessler-6 temporal trajectory by baseline distress levels"
+  ) &
+  theme(legend.position = "bottom",
+        plot.title      = element_text(face = "bold", hjust = 0))
+
+fig5gc
+```
+
+
+# Figure 6 - Potential Mechanism for Group Therapy
+
+```{r fig6_stfu_mech_vars}
+stfu_mech_vars <-
+  C2TB_stfu_wins %>%
+  select(optimism_z, soc_worth_status_fz,
+         self_efficacy_z,
+         communication_temp_z,
+         #loneliness_z, closeness_z,
+         #social_belonging_z,
+         social_inclusion_z,
+         meta_cognitive_z,
+         grit_index_z,
+         self_control_z) %>%
+  names()
+
+# Shared display labels for the 18 mechanism z-scores; keys MUST match the
+# variable names in `stfu_mech_vars`. Reused by both Panel A and Panel B.
+mech_labels <- c(
+  optimism_z            = "Optimistic future expectations",
+  soc_worth_status_fz   = "Social worth",
+  self_efficacy_z       = "Self efficacy",
+  communication_temp_z  = "Spousal communication",
+  #loneliness_z          = "Loneliness (reverse coded)",
+  meta_cognitive_z      = "Meta-cognitive coping",
+  #closeness_z           = "Interpersonal closeness",
+  social_inclusion_z    = "Social inclusion",
+  grit_index_z          = "Grit",
+  self_control_z        = "Self control"
+)
+
+stopifnot(setequal(names(mech_labels), stfu_mech_vars))
+
+C2TB_stfu_wins %>%
+  select(g_t, refugee, stfu_mech_vars) %>%
+  describeBy(group = c("g_t", "refugee"))
+
+# emmeans(psyInd_dep_hst_stfu_lm_rbst, ~ g_t | dep,
+#           at = list(g_t = c(0, 1), dep = c(0, 1))) %>%
+#   contrast(method = list("gipt - no gipt" = c(-1,1)))
+# 
+# emmeans(psyInd_dep_hst_stfu_lm_rbst, ~ g_t,
+#           at = list(g_t = c(0, 1))) %>%
+#   contrast(method = list("gipt - no gipt" = c(-1,1)))
+```
+
+```{r fig6_fit_all}
+# Fit Panel A (mech ~ g_t) and Panel B (psych_distress_index_z ~ mech) coef
+# tibbles for each of the four sub-samples up front, then derive shared
+# x-axis limits + breaks so panels are directly comparable across sub-samples.
+fig6_subsamples <- list(
+  hostDep   = list(
+    A = C2TB_stfu_wins %>% filter(refugee == 0, dep == 1),
+    #B = C2TB_stfu_wins %>% filter(refugee == 0, dep == 1, g_t == 1),
+    label = "high baseline distress hosts at 3m FU"),
+  hostNodep = list(
+    A = C2TB_stfu_wins %>% filter(refugee == 0, dep == 0),
+    #B = C2TB_stfu_wins %>% filter(refugee == 0, dep == 0, g_t == 1),
+    label = "low baseline distress hosts at 3m FU"),
+  refDep    = list(
+    A = C2TB_stfu_wins %>% filter(refugee == 1, dep == 1),
+    #B = C2TB_stfu_wins %>% filter(refugee == 1, dep == 1, g_t == 1),
+    label = "high baseline distress refugees at 3m FU"),
+  refNodep  = list(
+    A = C2TB_stfu_wins %>% filter(refugee == 1, dep == 0),
+    #B = C2TB_stfu_wins %>% filter(refugee == 1, dep == 0, g_t == 1),
+    label = "low baseline distress refugees at 3m FU")
+)
+
+fig6_coefs <- lapply(fig6_subsamples, function(sub) {
+  list(
+    A = run_mech_models(stfu_mech_vars, sub$A, label = sub$label)
+    # B = run_mech_predictors(stfu_mech_vars, sub$B,
+    #                         outcome = "psych_distress_index",
+    #                         label   = paste(sub$label, "— GIPT only"))
+  )
+})
+
+# Joint x-axis range across sub-samples (include 0, pad for label room),
+# then a nice break sequence via pretty().
+.panelA_ci <- do.call(rbind, lapply(fig6_coefs, function(x) x$A[, c("ci_low", "ci_high")]))
+#.panelB_ci <- do.call(rbind, lapply(fig6_coefs, function(x) x$B[, c("ci_low", "ci_high")]))
+
+panelA_range <- range(c(.panelA_ci$ci_low, .panelA_ci$ci_high, 0))
+#panelB_range <- range(c(.panelB_ci$ci_low, .panelB_ci$ci_high, 0))
+
+panelA_xlim   <- panelA_range + 0.20 * diff(panelA_range) * c(-1, 1)
+#panelB_xlim   <- panelB_range + 0.10 * diff(panelB_range) * c(-1, 1)
+
+panelA_breaks <- pretty(panelA_xlim, n = 5)
+#panelB_breaks <- pretty(panelB_xlim, n = 5)
+```
+
+## Hosts high baseline distress
+```{r fig6_host_dep}
+stfu_host_dep_mech_coef <- fig6_coefs$hostDep$A
+
+MECH_COL <- "steelblue1"   # one hue; single series needs no legend
+
+stfu_host_dep_mech_dfA <- stfu_host_dep_mech_coef %>%
+  mutate(
+    label   = unname(mech_labels[dv]),
+    stars   = case_when(p < .01 ~ "**", p < .05 ~ "*", p < .10 ~ "<sup>†</sup>", TRUE ~ ""),
+    lab_txt = paste0(sprintf("%.2f", estimate), stars),
+    # Always anchor the coefficient label at the right end of the errorbar
+    # and push it just outside via a negative hjust, so every label sits to
+    # the right of its point regardless of sign.
+    lab_x   = ci_high,
+    lab_h   = -0.25
+  ) %>%
+  mutate(label = fct_reorder(label, abs(estimate)))
+
+stfu_host_dep_mech <-
+  ggplot(stfu_host_dep_mech_dfA, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+  geom_errorbar(aes(xmin = ci_low, xmax = ci_high),
+                height = 0.20, linewidth = 0.7,
+                colour = scales::alpha(MECH_COL, 0.45), orientation = "y") +
+  geom_point(size = 3.2, colour = MECH_COL) +
+  geom_richtext(aes(x = lab_x, label = lab_txt, hjust = lab_h),
+                size = 3.4, colour = "grey20",
+                fill = NA, label.colour = NA) +
+  scale_x_continuous(limits = panelA_xlim, breaks = panelA_breaks,
+                     expand = expansion(mult = c(0.01, 0.01))) +
+  labs(x = "Effect size",
+       y = NULL,
+       title = "Host participants with higher baseline distress") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.3),
+    axis.text.y        = element_text(colour = "grey15"),
+    plot.title.position = "plot"
+  )
+
+stfu_host_dep_mech
+```
+
+## Hosts low baseline distress
+```{r fig6_host_nodep}
+stfu_host_nodep_mech_coef <- fig6_coefs$hostNodep$A
+
+MECH_COL <- "steelblue1"
+
+stfu_host_nodep_mech_dfA <- stfu_host_nodep_mech_coef %>%
+  mutate(
+    label   = unname(mech_labels[dv]),
+    stars   = case_when(p < .01 ~ "**", p < .05 ~ "*", p < .10 ~ "<sup>†</sup>", TRUE ~ ""),
+    lab_txt = paste0(sprintf("%.2f", estimate), stars),
+    # Labels always to the right of the point / errorbar (see host-dep panel).
+    lab_x   = ci_high,
+    lab_h   = -0.25
+  ) %>%
+  # Reuse the row order from the high-distress-host panel so all four Fig 4 A
+  # panels have identical y-axis ordering.
+  mutate(label = factor(label, levels = levels(stfu_host_dep_mech_dfA$label)))
+
+stfu_host_nodep_mech <-
+  ggplot(stfu_host_nodep_mech_dfA, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+  geom_errorbar(aes(xmin = ci_low, xmax = ci_high),
+                height = 0.20, linewidth = 0.7,
+                colour = scales::alpha(MECH_COL, 0.45), orientation = "y") +
+  geom_point(size = 3.2, colour = MECH_COL) +
+  geom_richtext(aes(x = lab_x, label = lab_txt, hjust = lab_h),
+                size = 3.4, colour = "grey20",
+                fill = NA, label.colour = NA) +
+  scale_x_continuous(limits = panelA_xlim, breaks = panelA_breaks,
+                     expand = expansion(mult = c(0.01, 0.01))) +
+  labs(x = "Effect size",
+       y = NULL,
+       title = "Host participants with lower baseline distress") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.3),
+    axis.text.y        = element_text(colour = "grey15"),
+    plot.title.position = "plot"
+  )
+
+stfu_host_nodep_mech
+```
+
+## Refugee high baseline distress
+```{r fig6_ref_dep}
+stfu_ref_dep_mech_coef <- fig6_coefs$refDep$A
+
+MECH_COL <- "steelblue1"
+
+stfu_ref_dep_mech_dfA <- stfu_ref_dep_mech_coef %>%
+  mutate(
+    label   = unname(mech_labels[dv]),
+    stars   = case_when(p < .01 ~ "**", p < .05 ~ "*", p < .10 ~ "<sup>†</sup>", TRUE ~ ""),
+    lab_txt = paste0(sprintf("%.2f", estimate), stars),
+    # Labels always to the right of the point / errorbar (see host-dep panel).
+    lab_x   = ci_high,
+    lab_h   = -0.25
+  ) %>%
+  # Reuse the row order from the high-distress-host panel so all four Fig 4 A
+  # panels have identical y-axis ordering.
+  mutate(label = factor(label, levels = levels(stfu_host_dep_mech_dfA$label)))
+
+stfu_ref_dep_mech <-
+  ggplot(stfu_ref_dep_mech_dfA, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+  geom_errorbar(aes(xmin = ci_low, xmax = ci_high),
+                height = 0.20, linewidth = 0.7,
+                colour = scales::alpha(MECH_COL, 0.45), orientation = "y") +
+  geom_point(size = 3.2, colour = MECH_COL) +
+  geom_richtext(aes(x = lab_x, label = lab_txt, hjust = lab_h),
+                size = 3.4, colour = "grey20",
+                fill = NA, label.colour = NA) +
+  scale_x_continuous(limits = panelA_xlim, breaks = panelA_breaks,
+                     expand = expansion(mult = c(0.01, 0.01))) +
+  labs(x = "Effect size",
+       y = NULL,
+       title = "Refugee participants with higher baseline distress") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.3),
+    axis.text.y        = element_text(colour = "grey15"),
+    plot.title.position = "plot"
+  )
+
+stfu_ref_dep_mech
+```
+
+## Refugee low baseline distress
+```{r fig6_ref_nodep}
+stfu_ref_nodep_mech_coef <- fig6_coefs$refNodep$A
+
+MECH_COL <- "steelblue1"
+
+stfu_ref_nodep_mech_dfA <- stfu_ref_nodep_mech_coef %>%
+  mutate(
+    label   = unname(mech_labels[dv]),
+    stars   = case_when(p < .01 ~ "**", p < .05 ~ "*", p < .10 ~ "<sup>†</sup>", TRUE ~ ""),
+    lab_txt = paste0(sprintf("%.2f", estimate), stars),
+    # Labels always to the right of the point / errorbar (see host-dep panel).
+    lab_x   = ci_high,
+    lab_h   = -0.25
+  ) %>%
+  # Reuse the row order from the high-distress-host panel so all four Fig 4 A
+  # panels have identical y-axis ordering.
+  mutate(label = factor(label, levels = levels(stfu_host_dep_mech_dfA$label)))
+
+stfu_ref_nodep_mech <-
+  ggplot(stfu_ref_nodep_mech_dfA, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+  geom_errorbar(aes(xmin = ci_low, xmax = ci_high),
+                height = 0.20, linewidth = 0.7,
+                colour = scales::alpha(MECH_COL, 0.45), orientation = "y") +
+  geom_point(size = 3.2, colour = MECH_COL) +
+  geom_richtext(aes(x = lab_x, label = lab_txt, hjust = lab_h),
+                size = 3.4, colour = "grey20",
+                fill = NA, label.colour = NA) +
+  scale_x_continuous(limits = panelA_xlim, breaks = panelA_breaks,
+                     expand = expansion(mult = c(0.01, 0.01))) +
+  labs(x = "Effect size",
+       y = NULL,
+       title = "Refugee participants with lower baseline distress") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.3),
+    axis.text.y        = element_text(colour = "grey15"),
+    plot.title.position = "plot"
+  )
+
+stfu_ref_nodep_mech
+```
+
+# Figure 7 - Correlates to Psych Distress
+```{r fig7_overall_predictors}
+# Panel B analogue on the entire STFU sample: shows how strongly each
+# psychosocial mechanism variable correlates with psychological distress at
+# 3m FU, holding baseline Kessler-6 constant. No subgroup or GIPT filter.
+stfu_overall_mech_coef <-
+  run_mech_predictors(stfu_mech_vars, C2TB_stfu_wins,
+                      outcome = "psych_distress_index",
+                      label   = "entire sample at 3m FU")
+
+MECH_COL <- "steelblue1"
+
+fig7_overall_df <- stfu_overall_mech_coef %>%
+  mutate(
+    label   = unname(mech_labels[dv]),
+    stars   = case_when(p < .001 ~ "***",
+                        p < .01  ~ "**",
+                        p < .05  ~ "*",
+                        p < .10  ~ "<sup>†</sup>",
+                        TRUE     ~ ""),
+    lab_txt = paste0(sprintf("%.2f", estimate), stars),
+    # Always anchor the coefficient label at the right end of the errorbar
+    # and push it just outside via a negative hjust, regardless of sign, so
+    # every label sits to the right of its point and error bar.
+    lab_x   = ci_high,
+    lab_h   = -0.25
+  ) %>%
+  mutate(label = fct_reorder(label, abs(estimate)))
+
+stopifnot(!any(is.na(fig7_overall_df$label)))
+
+fig7_overall_predictors <-
+  ggplot(fig7_overall_df, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+  geom_errorbar(aes(xmin = ci_low, xmax = ci_high),
+                height = 0.20, linewidth = 0.7,
+                colour = scales::alpha(MECH_COL, 0.45), orientation = "y") +
+  geom_point(size = 3.2, colour = MECH_COL) +
+  geom_richtext(aes(x = lab_x, label = lab_txt, hjust = lab_h),
+                size = 3.4, colour = "grey20",
+                fill = NA, label.colour = NA) +
+  # Extra right-side padding so the always-right coefficient labels have room
+  # to sit outside the widest errorbar without being clipped.
+  scale_x_continuous(expand = expansion(mult = c(0.06, 0.14))) +
+  labs(x = "Effect size\n(std. to Means and SDs of refugee Graduation control group)",
+       y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y  = element_blank(),
+    panel.grid.minor    = element_blank(),
+    panel.grid.major.x  = element_line(colour = "grey92", linewidth = 0.3),
+    axis.text.y         = element_text(size = 12),
+    axis.title.x        = element_text(size = 11),
+    plot.title.position = "plot"
+  )
+
+fig7_overall_predictors
+```
+
