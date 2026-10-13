@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.RDataTmp
+
+# knitr intermediates and large knitted outputs
+*_cache/
+*_files/
+*.html
