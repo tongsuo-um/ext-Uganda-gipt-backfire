@@ -300,13 +300,14 @@ emm_to_k6_line_nodep_df <- function(emm, time_point) {
 
 
 ```{r import_data, include=FALSE}
-C2TB_bsl <- import("gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
+C2TB_bsl <-
+  import("replication_data/gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
 
 C2TB_stfu_wins <-
-  import("gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
+  import("replication_data/gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
 
 C2TB_enl_wins <-
-  import("gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
+  import("replication_data/gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
 ```
 
 

@@ -152,18 +152,19 @@ std_to_ref <- function(x, ref, sign = 1) {
 
 
 ```{r import_data, include=FALSE}
-C2TB_bsl <- import("gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
+C2TB_bsl <-
+  import("replication_data/gipt_uganda_cohort2-trialB_baseline_openaccess.dta")
 
 C2TB_stfu_wins <-
-  import("gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
+  import("replication_data/gipt_uganda_cohort2-trialB_3mFU_openaccess.dta")
 
 C2TB_enl_wins <-
-  import("gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
+  import("replication_data/gipt_uganda_cohort2-trialB_20mFU_openaccess.dta")
 ```
 
 
 # Balance Table at Baseline
-```{r bsl_balance_check}
+```{r bsl_balance_check, tidy=FALSE}
 # Balance check across g_t = 0 vs g_t = 1 for the following baseline variables
 # (all pulled from C2TB_stfu_wins). Continuous vars are summarized with
 # Mean (SD) and compared with Welch's two-sample t; binary vars are
@@ -285,10 +286,10 @@ build_bal_row <- function(varname, label, test, df) {
 
   tibble::tibble(
     Variable = label,
-    N0       = n_cell(n0),
-    MSD0     = msd_cell(apa_num2(m0), apa_num2(s0)),
-    N1       = n_cell(n1),
-    MSD1     = msd_cell(apa_num2(m1), apa_num2(s1)),
+    N0      = n_cell(n0),
+    MSD0    = msd_cell(apa_num2(m0), apa_num2(s0)),
+    N1      = n_cell(n1),
+    MSD1    = msd_cell(apa_num2(m1), apa_num2(s1)),
     t        = t_cell(apa_num2(stat), sig_star(pval), test)
   )
 }
