@@ -1,7 +1,7 @@
 ---
 title: "G2R GIPT Backfire - Supplementary Materials"
 subtitle: "Cohort 2 Trial B"
-author: "Tong Suo"
+author: "Anonymous"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
   html_document:
