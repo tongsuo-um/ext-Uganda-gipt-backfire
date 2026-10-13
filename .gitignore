@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 .RDataTmp
+*.Rproj
 
 # knitr intermediates and large knitted outputs
 *_cache/
