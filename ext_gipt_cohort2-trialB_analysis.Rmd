@@ -245,7 +245,7 @@ bal_vars <- tibble::tribble(
   "someprimary_head",   "HH head with some primary schooling",     "chi",
   "somesecondary_head", "HH head with some secondary schooling",   "chi",
   "hhsize",             "Household size",                          "t",
-  "coh1_holdout",       "Cohort-1 holdout",                        "chi",
+  "coh1_holdout",       "Former Cohort-1 participan",              "chi",
   "dep",                "Baseline: high distress (Kessler >= 5)",  "t",
   "kessler_6_bsl",      "Baseline: Kessler-6",                     "t",
   "cantrils_bsl",       "Baseline: global life satisfaction",      "t",
