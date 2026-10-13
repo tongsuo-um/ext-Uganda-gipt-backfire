@@ -2325,6 +2325,24 @@ stfu_ref_nodep_mech <-
 stfu_ref_nodep_mech
 ```
 
+### Stacked FIGURE (2 × 2)
+```{r fig6_stacked}
+# Figure 6 as it appears in the manuscript: 2 x 2 grid of the four mechanism
+# panels built above. Rows = baseline-distress stratum (high / low);
+# columns = sample (host / refugee). The four panels share the common
+# `panelA_xlim` + `panelA_breaks` already baked into each panel's
+# scale_x_continuous call, so x-axes align cleanly.
+fig6_stacked <-
+  (stfu_host_dep_mech_A   | stfu_host_nondep_mech_A) /
+  (stfu_ref_dep_mech_A | stfu_ref_nodep_mech_A) +
+  plot_annotation(tag_levels = "A") &
+  theme(plot.tag          = element_text(face = "bold", size = 14),
+        plot.tag.position = c(0, 1))
+
+fig6_stacked
+```
+
+
 # Figure 7 - Correlates to Psych Distress
 ```{r fig7_overall_predictors}
 # Panel B analogue on the entire STFU sample: shows how strongly each
