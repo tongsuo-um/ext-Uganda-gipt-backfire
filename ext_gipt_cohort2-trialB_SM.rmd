@@ -39,6 +39,7 @@ library(patchwork)
 library(ggh4x)
 library(psych)
 library(webshot2)
+library(estimatr)
 ```
 
 ```{r helper_func, include=FALSE}
@@ -149,6 +150,210 @@ compute_row <- function(var, label, df, theo_lo, theo_hi) {
     `Observed range`    = range_cell(min(x), max(x))
   )
 }
+
+# ---------------------------------------------------------------------------
+# Mechanism-regression helpers (migrated from ext_gipt_cohort2-trialB_figures.Rmd
+# so this file knits standalone).
+#
+# `run_mech_models(dvs, data)` fits one `dv ~ g_t + covariates + village FE`
+# model per mechanism and returns a tibble of g_t coefficients + their t and
+# 95% CI. The mechanism outcomes are pre-standardized to the refugee Graduation
+# control (variables end in `_z` / `_fz`), so each coefficient IS a
+# standardized effect size β.
+#
+# `run_mech_predictors(mechs, data)` fits one
+# `psych_distress_index ~ mech + baseline Kessler-6 + covariates + village FE`
+# model per mechanism and returns the mech coefficient. Both outcome and
+# predictor are already z-scored, so each coefficient is likewise a
+# standardized β.
+# ---------------------------------------------------------------------------
+run_mech_models <- function(dvs, data,
+                            controls = c("kessler_6_bsl", "female_head",
+                                         "someprimary_head", "somesecondary_head",
+                                         "hhsize", "coh1_holdout"),
+                            fe       = "c2_vil_clus_id",
+                            label    = NA_character_) {
+
+  map_dfr(dvs, function(dv) {
+    f <- reformulate(c("g_t", controls, sprintf("factor(%s)", fe)), response = dv)
+    m <- lm_robust(f, data = data, se_type = "HC1")
+    row <- tidy(m) %>% filter(term == "g_t")
+    tibble(
+      sample    = label,
+      dv        = dv,
+      estimate  = row$estimate,
+      se        = row$std.error,
+      ci_low    = row$conf.low,
+      ci_high   = row$conf.high,
+      t         = row$statistic,
+      df        = row$df,
+      p         = row$p.value,
+      N         = m$nobs
+    )
+  })
+}
+
+run_mech_predictors <- function(mechs, data,
+                                outcome  = "psych_distress_index",
+                                lag      = "kessler_6_bsl",
+                                controls = c("female_head", "someprimary_head",
+                                             "somesecondary_head", "hhsize",
+                                             "coh1_holdout"),
+                                fe       = "c2_vil_clus_id",
+                                label    = NA_character_) {
+
+  map_dfr(mechs, function(mech) {
+    f <- reformulate(c(mech, lag, controls, sprintf("factor(%s)", fe)),
+                     response = outcome)
+    m <- lm_robust(f, data = data, se_type = "HC1")
+    row <- tidy(m) %>% filter(term == mech)
+    if (nrow(row) != 1L) stop("term not found in fit: ", mech)
+    tibble(
+      sample   = label,
+      outcome  = outcome,
+      dv       = mech,
+      estimate = row$estimate,
+      se       = row$std.error,
+      ci_low   = row$conf.low,
+      ci_high  = row$conf.high,
+      t        = row$statistic,
+      df       = row$df,
+      p        = row$p.value,
+      N        = m$nobs
+    )
+  })
+}
+
+# ---- Mechanism vocabulary ----
+# Variable names (as they appear in C2TB_stfu_wins) and human-readable labels,
+# kept in the same order used by the figures Rmd.
+mech_vars <- c(
+  "optimism_z", "soc_worth_status_fz", "self_efficacy_z",
+  "communication_temp_z", "social_inclusion_z",
+  "meta_cognitive_z", "grit_index_z", "self_control_z"
+)
+mech_labels <- c(
+  optimism_z            = "Optimistic future expectations",
+  soc_worth_status_fz   = "Social worth",
+  self_efficacy_z       = "Self-efficacy",
+  communication_temp_z  = "Spousal communication",
+  meta_cognitive_z      = "Meta-cognitive coping",
+  social_inclusion_z    = "Social inclusion",
+  grit_index_z          = "Grit",
+  self_control_z        = "Self-control"
+)
+stopifnot(setequal(names(mech_labels), mech_vars))
+
+# ---- Significance-sign helper (dagger + stars) ----
+mech_sig <- function(p) dplyr::case_when(
+  is.na(p) ~ "",
+  p < .001 ~ "***",
+  p < .01  ~ "**",
+  p < .05  ~ "*",
+  p < .10  ~ "<sup>&dagger;</sup>",
+  TRUE     ~ ""
+)
+
+# ---- Decimal-aligned cell wrappers (2 dp, APA no-leading-zero) ----
+# Each numeric cell sits in a fixed-width right-aligned inline-block so
+# the decimal points column-align across rows.
+mech_num_cell <- function(x, width = "2.5em") {
+  paste0("<span style='display:inline-block;width:", width,
+         ";text-align:right'>", apa_num(x, 2), "</span>")
+}
+mech_t_cell <- function(t, p, width = "2.5em") {
+  paste0("<span style='display:inline-block;width:", width,
+         ";text-align:right'>", apa_num(t, 2), "</span>",
+         "<span style='display:inline-block;min-width:1.6em;text-align:left'>",
+         mech_sig(p), "</span>")
+}
+mech_ci_cell <- function(lo, hi, width = "2.5em") {
+  paste0(
+    "[",
+    "<span style='display:inline-block;width:", width,
+    ";text-align:right'>", apa_num(lo, 2), "</span>",
+    ", ",
+    "<span style='display:inline-block;width:", width,
+    ";text-align:right'>", apa_num(hi, 2), "</span>",
+    "]"
+  )
+}
+
+# ---- Build a mechanism table from a run_mech_* output tibble ----
+# `order_from` lets the Hosts-high-distress panel define the row order, which
+# we then reuse across the other three Figure-6 subpanels so Tables S6B/C/D
+# line up visually with Table S6A (matches the shared y-axis in Figure 6).
+# Captions and footnotes are intentionally omitted here — add them manually
+# in the manuscript.
+build_mech_table <- function(coef_df, order_from = NULL,
+                             t_width = "1.0in") {
+  if (is.null(order_from)) {
+    ordered_dv <- coef_df %>% arrange(desc(abs(estimate))) %>% pull(dv)
+  } else {
+    ordered_dv <- order_from
+  }
+  tbl <- coef_df %>%
+    mutate(dv = factor(dv, levels = ordered_dv)) %>%
+    arrange(dv) %>%
+    transmute(
+      Mechanism = unname(mech_labels[as.character(dv)]),
+      beta      = mech_num_cell(estimate),
+      CI95      = mech_ci_cell(ci_low, ci_high),
+      t_val     = mech_t_cell(t, p)
+    )
+  # The `mech-table` class picks up the outer margin + cell padding declared
+  # in the CSS block above. `t_width` is parameterized because Table S7 ships
+  # bigger |t| values (full-sample N) + always-significant stars, so it needs
+  # a wider t column than the four Table S6 panels.
+  kbl(
+    tbl,
+    col.names = c("Mechanism", "&beta;", "95% CI", "<i>t</i>"),
+    align     = "lccc",
+    escape    = FALSE
+  ) %>%
+    kable_styling(full_width       = FALSE,
+                  bootstrap_options = c("hover", "condensed"),
+                  htmltable_class   = "mech-table") %>%
+    column_spec(1, width = "4.0in") %>%
+    column_spec(2, width = "1.0in") %>%
+    column_spec(3, width = "2.0in") %>%
+    column_spec(4, width = t_width)
+}
+
+# ---- Save a mech kable as a PNG WITH outer padding ----
+# `kableExtra::save_kable()` ships the kable to webshot, which crops tightly
+# to the table bounding box, so CSS margins outside the table are trimmed
+# off. To keep the whitespace we:
+#   1. save_kable() first to a temporary self-contained HTML,
+#   2. inject body-level padding + make `<body>` shrink-wrap its content
+#      via `display:inline-block`,
+#   3. webshot2 the padded body — the capture is now (table width + 2*pad_px)
+#      wide and (table height + 2*pad_px) tall.
+save_mech_table <- function(kbl_obj, file, zoom = 2, pad_px = 28) {
+  tmp <- tempfile(fileext = ".html")
+  save_kable(kbl_obj, file = tmp)
+  html <- readLines(tmp, warn = FALSE)
+  pad_rule <- sprintf(paste0(
+    "<style>",
+    "html,body{margin:0;}",
+    "body{padding:%dpx;background:#fff;display:inline-block;}",
+    "table.mech-table{margin:0 !important;}",
+    "table.mech-table th,",
+    "table.mech-table td{padding:0.45em 0.9em !important;}",
+    "</style>"
+  ), pad_px)
+  idx <- grep("</head>", html, fixed = TRUE)[1]
+  html[idx] <- sub("</head>", paste0(pad_rule, "</head>"),
+                   html[idx], fixed = TRUE)
+  writeLines(html, tmp)
+  webshot2::webshot(
+    url      = paste0("file://", normalizePath(tmp, winslash = "/")),
+    file     = file,
+    zoom     = zoom,
+    selector = "body"
+  )
+  invisible(file)
+}
 ```
 
 
@@ -168,9 +373,9 @@ C2TB_enl_wins <-
 ```{r outcome_desp}
 # Order of time points: baseline block, then 3m FU block, then 20m FU block.
 # Theoretical range reported only for the scale-bounded measures (K6, Cantril
-# ladder, FCS, K10, PHQ-9, GAD-7, subjective peacefulness, positive affect);
-# left blank for the composite z-score indices and the two binary baseline
-# indicators.
+# ladder, FCS, K10, PHQ-9, GAD-7, subjective peacefulness, positive affect,
+# healthy days, subjective health avg, good-functioning days); left blank
+# for the composite z-score indices and the two binary baseline indicators.
 #
 # Baseline block: pulled from C2TB_bsl (the baseline analysis file). Note:
 # baseline Ns here reflect the full baseline sample, which can differ from
@@ -183,25 +388,30 @@ C2TB_enl_wins <-
 # wave_set: "bsl" => baseline block only
 #           "fu"  => appears in BOTH 3m FU and 20m FU blocks
 desc_vars <- tibble::tribble(
-  ~var,                   ~label,                               ~wave_set, ~theo_lo, ~theo_hi,
-  "kessler_6_bsl",        "Kessler-6",                          "bsl",      0,        24,
-  "cantrils_bsl",         "Global life satisfaction",          "bsl",      1,        10,
-  "bsl_fambus",           "Household owns family business",     "bsl",      NA,       NA,
-  "bsl_outhh_empl",       "Household member works for payment", "bsl",      NA,       NA,
-  "fcs_bsl",              "Food consumption score",             "bsl",      0,        112,
-  "psych_distress_index", "Psychological distress index",       "fu",       NA,       NA,
-  "kessler_10",           "Kessler-10",                         "fu",       0,        40,
-  "phq_total_score",      "PHQ-9",                              "fu",       0,        27,
-  "gad_total_score",      "GAD-7",                              "fu",       0,        21,
-  "psych_well_being_z",   "Psychological well-being index",       "fu",       NA,       NA,
-  "cantrils",             "Global life satisfaction",          "fu",       1,        10,
-  "subj_peace",           "Subjective peacefulness",            "fu",       1,        10,
-  "positive_affect",      "Positive affect",                    "fu",       0,        1,
-  "econ_activity_index",  "Economic activity index",            "fu",       NA,       NA,
-  "labor_supply_index",   "Labor supply index",                 "fu",       NA,       NA,
-  "investment_index",     "Investment index",                   "fu",       NA,       NA,
-  "econ_expansion_index", "Economic expansion index",           "fu",       NA,       NA,
-  "fcs",                  "Food consumption score",             "fu",       0,        112
+  ~var,                     ~label,                               ~wave_set, ~theo_lo, ~theo_hi,
+  "kessler_6_bsl",          "Kessler-6",                          "bsl",      0,        24,
+  "cantrils_bsl",           "Global life satisfaction",           "bsl",      1,        10,
+  "brfss_health_index_bsl", "BRFSS health index",                 "bsl",      NA,       NA,
+  "bsl_fambus",             "Household owns family business",     "bsl",      NA,       NA,
+  "bsl_outhh_empl",         "Household member works for payment", "bsl",      NA,       NA,
+  "fcs_bsl",                "Food consumption score",             "bsl",      0,        112,
+  "psych_distress_index",   "Psychological distress index",       "fu",       NA,       NA,
+  "kessler_10",             "Kessler-10",                         "fu",       0,        40,
+  "phq_total_score",        "PHQ-9",                              "fu",       0,        27,
+  "gad_total_score",        "GAD-7",                              "fu",       0,        21,
+  "psych_well_being_z",     "Psychological well-being index",     "fu",       NA,       NA,
+  "cantrils",               "Global life satisfaction",           "fu",       1,        10,
+  "subj_peace",             "Subjective peacefulness",            "fu",       1,        10,
+  "positive_affect",        "Positive affect",                    "fu",       0,        1,
+  "brfss_health_index",     "BRFSS health index",                 "fu",       NA,       NA,
+  "healthy_days",           "Healthy days",                       "fu",      -30,       30,
+  "sub_health_avg",         "Subjective health (physical/mental avg)", "fu", 1,        4,
+  "good_function_days",     "Good-functioning days",              "fu",       0,        30,
+  "econ_activity_index",    "Economic activity index",            "fu",       NA,       NA,
+  "labor_supply_index",     "Labor supply index",                 "fu",       NA,       NA,
+  "investment_index",       "Investment index",                   "fu",       NA,       NA,
+  "econ_expansion_index",   "Economic expansion index",           "fu",       NA,       NA,
+  "fcs",                    "Food consumption score",             "fu",       0,        112
 )
 
 bsl_idx <- which(desc_vars$wave_set == "bsl")
@@ -209,7 +419,10 @@ fu_idx  <- which(desc_vars$wave_set == "fu")
 
 rows_bsl <- purrr::map_dfr(bsl_idx, function(i) {
   r <- desc_vars[i, ]
-  compute_row(r$var, r$label, C2TB_bsl, r$theo_lo, r$theo_hi)
+  # brfss_health_index_bsl isn't carried in the published baseline file,
+  # so pull it from C2TB_stfu_wins (where it was joined forward).
+  df_src <- if (r$var == "brfss_health_index_bsl") C2TB_stfu_wins else C2TB_bsl
+  compute_row(r$var, r$label, df_src, r$theo_lo, r$theo_hi)
 })
 rows_stfu <- purrr::map_dfr(fu_idx, function(i) {
   r <- desc_vars[i, ]
@@ -251,17 +464,18 @@ tableS1_kbl
 
 # Table S2. Correlations among primary outcomes at 3m FU and 20m FU
 
-Four primary outcomes at each of two follow-ups are jointly correlated:
+Five primary outcomes at each of two follow-ups are jointly correlated:
 psychological distress (`psych_distress_index`), psychological well-being
-(`psych_well_being_z`), economic activity (`econ_activity_index`), and
-food security (`fcs`), each measured at the 3-month follow-up (`_stfu`)
-and the 20-month follow-up (`_enl`). Correlations are Pearson
-product-moment coefficients computed on pairwise-complete cases;
-significance signs use the same scheme as the regression tables
+(`psych_well_being_z`), BRFSS health index (`brfss_health_index`),
+economic activity (`econ_activity_index`), and food security (`fcs`),
+each measured at the 3-month follow-up (`_stfu`) and the 20-month
+follow-up (`_enl`). Correlations are Pearson product-moment coefficients
+computed on pairwise-complete cases; significance signs use the same
+scheme as the regression tables
 (`&dagger; p < .10, * p < .05, ** p < .01, *** p < .001`).
 
 ```{r cor_dv_setup, include = FALSE}
-# Wide frame of the 4 primary DVs at both follow-ups, joined on hhid.
+# Wide frame of the 5 primary DVs at both follow-ups, joined on hhid.
 # `full_join` keeps every household that appears at either follow-up so no
 # pair is dropped unnecessarily; `cor.test` uses pairwise-complete cases
 # inside `build_cor_table`, so per-cell N will vary.
@@ -270,6 +484,7 @@ cor_wide <-
   dplyr::select(hhid,
                 distress_stfu  = psych_distress_index,
                 wellbeing_stfu = psych_well_being_z,
+                brfss_stfu     = brfss_health_index,
                 econ_stfu      = econ_activity_index,
                 fcs_stfu       = fcs) %>%
   dplyr::full_join(
@@ -277,22 +492,25 @@ cor_wide <-
       dplyr::select(hhid,
                     distress_enl  = psych_distress_index,
                     wellbeing_enl = psych_well_being_z,
+                    brfss_enl     = brfss_health_index,
                     econ_enl      = econ_activity_index,
                     fcs_enl       = fcs),
     by = "hhid"
   )
 
-dv_vars_wide <- c("distress_stfu",  "wellbeing_stfu", "econ_stfu",  "fcs_stfu",
-                  "distress_enl",   "wellbeing_enl",  "econ_enl",   "fcs_enl")
+dv_vars_wide <- c("distress_stfu",  "wellbeing_stfu", "brfss_stfu", "econ_stfu",  "fcs_stfu",
+                  "distress_enl",   "wellbeing_enl",  "brfss_enl",  "econ_enl",   "fcs_enl")
 
 # Two-line labels via <br>: DV name on line 1, timepoint on line 2.
 dv_labels_wide <- c(
   "Psychological distress<br><em>(3m FU)</em>",
   "Psychological well-being<br><em>(3m FU)</em>",
+  "BRFSS health index<br><em>(3m FU)</em>",
   "Economic activity<br><em>(3m FU)</em>",
   "Food security<br><em>(3m FU)</em>",
   "Psychological distress<br><em>(20m FU)</em>",
   "Psychological well-being<br><em>(20m FU)</em>",
+  "BRFSS health index<br><em>(20m FU)</em>",
   "Economic activity<br><em>(20m FU)</em>",
   "Food security<br><em>(20m FU)</em>"
 )
@@ -301,9 +519,9 @@ dv_labels_wide <- c(
 ```{r cor_combined}
 build_cor_table(cor_wide, dv_vars_wide, dv_labels_wide,
                 cell_width = "4em") %>%
-  kbl(align   = "lcccccccc",
+  kbl(align   = "lcccccccccc",
       escape  = FALSE,
-      caption = "Table S1. Correlations among primary outcomes at 3m FU and 20m FU.") %>%
+      caption = "Table S2. Correlations among primary outcomes at 3m FU and 20m FU.") %>%
   kable_styling(full_width = FALSE,
                 bootstrap_options = c("hover", "condensed")) %>%
   footnote(general       = "&dagger; p < .10, * p < .05, ** p < .01, *** p < .001. Pearson correlations on pairwise-complete cases; per-cell N varies with joint missingness.",
@@ -401,4 +619,122 @@ C2TB_stfu_wins %>%
   dplyr::select(close_household, close_spouse, close_community,
                              loneliness) %>%
   alpha()
+```
+
+# Table S4
+
+Generated by [ANONYMOUS - data manager of the Graduation to Resillience umbrella project] using data from Graduation vs. Control experiment trial. 
+
+# Table S5
+
+Generated by [ANONYMOUS - data manager of the Graduation to Resillience umbrella project] using data from Graduation vs. Control experiment trial. 
+
+
+# Table S6. Stats Details for Figure 6
+
+```{css mech_table_css, echo=FALSE}
+/* Scoped styling for the mechanism tables (S6A–D and S7). Tables S1 / S2
+   use the default kable look and are not affected. */
+table.mech-table {
+  margin: 1em 1em 1em 0.5em !important;
+}
+table.mech-table th,
+table.mech-table td {
+  padding: 0.45em 0.9em !important;
+}
+```
+
+```{r tableS6_fit}
+# Fit the four Figure-6 subsamples once; reuse coef tibbles for each sub-table.
+# Keys mirror the figures-Rmd structure: hostDep / hostNodep / refDep / refNodep.
+tableS6_coefs <- list(
+  hostDep   = run_mech_models(mech_vars,
+                              C2TB_stfu_wins %>% filter(refugee == 0, dep == 1),
+                              label = "Hosts × high baseline distress"),
+  hostNodep = run_mech_models(mech_vars,
+                              C2TB_stfu_wins %>% filter(refugee == 0, dep == 0),
+                              label = "Hosts × low baseline distress"),
+  refDep    = run_mech_models(mech_vars,
+                              C2TB_stfu_wins %>% filter(refugee == 1, dep == 1),
+                              label = "Refugees × high baseline distress"),
+  refNodep  = run_mech_models(mech_vars,
+                              C2TB_stfu_wins %>% filter(refugee == 1, dep == 0),
+                              label = "Refugees × low baseline distress")
+)
+
+# Row ordering: largest |β| in Hosts × high distress first; the other three
+# tables keep this same ordering to match Figure 6's shared y-axis.
+tableS6_order <- tableS6_coefs$hostDep %>%
+  arrange(desc(abs(estimate))) %>%
+  pull(dv)
+```
+
+## Table S6A. Hosts with high baseline distress
+```{r tableS6A}
+tableS6A_kbl <- build_mech_table(tableS6_coefs$hostDep,
+                                 order_from = tableS6_order)
+tableS6A_kbl
+
+# ---- Save as high-DPI PNG next to the Rmd ----
+# `save_mech_table` wraps save_kable so the PNG keeps outer whitespace on
+# every side (plain save_kable crops tightly to the table bounding box).
+# zoom = 2 roughly doubles pixel density for crisp output in Word/Keynote;
+# bump to zoom = 3 for print-quality.
+# save_mech_table(tableS6A_kbl,
+#                 file = "output/tableS6A_hosts_hidistress.png",
+#                 zoom = 2)
+```
+
+## Table S6B. Hosts with low baseline distress
+```{r tableS6B}
+tableS6B_kbl <- build_mech_table(tableS6_coefs$hostNodep,
+                                 order_from = tableS6_order)
+tableS6B_kbl
+
+# save_mech_table(tableS6B_kbl,
+#                 file = "output/tableS6B_hosts_lodistress.png",
+#                 zoom = 2)
+```
+
+## Table S6C. Refugees with high baseline distress
+```{r tableS6C}
+tableS6C_kbl <- build_mech_table(tableS6_coefs$refDep,
+                                 order_from = tableS6_order)
+tableS6C_kbl
+
+# save_mech_table(tableS6C_kbl,
+#                 file = "output/tableS6C_refugees_hidistress.png",
+#                 zoom = 2)
+```
+
+## Table S6D. Refugees with low baseline distress
+```{r tableS6D}
+tableS6D_kbl <- build_mech_table(tableS6_coefs$refNodep,
+                                 order_from = tableS6_order)
+tableS6D_kbl
+
+# save_mech_table(tableS6D_kbl,
+#                 file = "output/tableS6D_refugees_lodistress.png",
+#                 zoom = 2)
+```
+
+
+# Table S7. Stats Details for Figure 7
+
+```{r tableS7}
+# Figure 7: each mechanism (z-scored) predicting psych_distress_index (also
+# z-scored) at 3m FU, controlling for baseline Kessler-6 + stratification
+# covariates + village FE, in the full STFU sample.
+tableS7_coefs <- run_mech_predictors(
+  mech_vars, C2TB_stfu_wins,
+  outcome = "psych_distress_index",
+  label   = "entire sample at 3m FU"
+)
+
+tableS7_kbl <- build_mech_table(tableS7_coefs, t_width = "3.0in")
+tableS7_kbl
+
+# save_mech_table(tableS7_kbl,
+#                 file = "output/tableS7_mech_predictors_psych_distress.png",
+#                 zoom = 2)
 ```

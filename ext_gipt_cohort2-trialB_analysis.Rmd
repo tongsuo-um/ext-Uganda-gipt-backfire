@@ -180,9 +180,10 @@ C2TB_enl_wins <-
 #   somesecondary_head (chi-square)
 #   hhsize
 #   coh1_holdout       (chi-square)
-#   dep
+#   dep                (chi-square)
 #   kessler_6_bsl
 #   cantrils_bsl
+#   brfss_health_index_bsl
 #   bsl_fambus         (chi-square)
 #   bsl_outhh_empl     (chi-square)
 #   fcs_bsl
@@ -247,9 +248,10 @@ bal_vars <- tibble::tribble(
   "somesecondary_head", "HH head with some secondary schooling",   "chi",
   "hhsize",             "Household size",                          "t",
   "coh1_holdout",       "Former Cohort-1 participan",              "chi",
-  "dep",                "Baseline: high distress (Kessler >= 5)",  "t",
+  "dep",                "Baseline: high distress (Kessler >= 5)",  "chi",
   "kessler_6_bsl",      "Baseline: Kessler-6",                     "t",
   "cantrils_bsl",       "Baseline: global life satisfaction",      "t",
+  "brfss_health_index_bsl", "Baseline: BRFSS health index",        "t",
   "bsl_fambus",         "Baseline: HH owns business",              "chi",
   "bsl_outhh_empl",     "Baseline: HH member works for payment",   "chi",
   "fcs_bsl",            "Baseline: FCS",                           "t"
@@ -305,7 +307,7 @@ kableExtra::kbl(bal_tab,
                 escape    = FALSE) %>%
   kableExtra::add_header_above(
     c(" " = 1,
-      "Control" = 2,
+      "Graduation Control" = 2,
       "Group Therapy"    = 2,
       " " = 1),
     escape = FALSE
@@ -323,7 +325,7 @@ kableExtra::kbl(bal_tab,
 
 Let's take a look at regression table first.
 
-```{r psych_stfu_regtab}
+```{r psych_stfu_regtab, results='hide', include=FALSE}
 psyInd_stfu_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
               female_head + someprimary_head +
@@ -430,6 +432,52 @@ modelsummary(
   output = "html",
   escape = FALSE   # let raw HTML in `stars` (the <sup>…</sup> tags) render
 )
+```
+
+Psych distress index
+```{r psych_stfu_regsumm1}
+summary(psyInd_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+
+```
+
+Kessler-10
+```{r psych_stfu_regsumm2}
+summary(ksl10_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler-6
+```{r psych_stfu_regsumm3}
+summary(ksl6_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ-9
+```{r psych_stfu_regsumm4}
+summary(phq_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD-7
+```{r psych_stfu_regsumm5}
+summary(gad_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -595,7 +643,7 @@ contrast(gad_stfu_emm_rbst,
 
 
 Let's take a look at regression table first.
-```{r psych_enl_regtab}
+```{r psych_enl_regtab, results='hide', include=FALSE}
 psyInd_enl_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t + kessler_6_bsl + female_head +
               someprimary_head + somesecondary_head + hhsize + coh1_holdout,
@@ -686,6 +734,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_enl_regsumm1}
+summary(psyInd_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_enl_regsumm2}
+summary(ksl10_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_enl_regsumm3}
+summary(ksl6_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_enl_regsumm4}
+summary(phq_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_enl_regsumm5}
+summary(gad_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -857,7 +950,7 @@ contrast(gad_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psych_hst_stfu_regtab}
+```{r psych_hst_stfu_regtab, results='hide', include=FALSE}
 psyInd_hst_stfu_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t +  kessler_6_bsl +
               female_head + someprimary_head + somesecondary_head + hhsize +
@@ -960,6 +1053,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_hst_stfu_regsumm1}
+summary(psyInd_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_hst_stfu_regsumm2}
+summary(ksl10_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_hst_stfu_regsumm3}
+summary(ksl6_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_hst_stfu_regsumm4}
+summary(phq_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_hst_stfu_regsumm5}
+summary(gad_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -1132,7 +1270,7 @@ contrast(gad_hst_stfu_emm_rbst,
 
 
 Let's take a look at regression table first.
-```{r psych_hst_hst_enl_regtab}
+```{r psych_hst_hst_enl_regtab, results='hide', include=FALSE}
 psyInd_hst_enl_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
               female_head + someprimary_head +
@@ -1233,6 +1371,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_hst_hst_enl_regsumm1}
+summary(psyInd_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_hst_hst_enl_regsumm2}
+summary(ksl10_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_hst_hst_enl_regsumm3}
+summary(ksl6_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_hst_hst_enl_regsumm4}
+summary(phq_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_hst_hst_enl_regsumm5}
+summary(gad_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -1403,7 +1586,7 @@ contrast(gad_hst_enl_emm_rbst,
 
 
 Let's take a look at regression table first.
-```{r psych_dep_hst_stfu_regtab}
+```{r psych_dep_hst_stfu_regtab, results='hide', include=FALSE}
 psyInd_dep_stfu_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl + female_head + someprimary_head +
               somesecondary_head + hhsize + coh1_holdout,
@@ -1501,6 +1684,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_dep_hst_stfu_regsumm1}
+summary(psyInd_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_dep_hst_stfu_regsumm2}
+summary(ksl10_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_dep_hst_stfu_regsumm3}
+summary(ksl6_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_dep_hst_stfu_regsumm4}
+summary(phq_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_dep_hst_stfu_regsumm5}
+summary(gad_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Psychological distress index (`psych_distress_index`)
@@ -1684,7 +1912,7 @@ contrast(gad_dep_hst_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psych_dep_hst_enl_regtab}
+```{r psych_dep_hst_enl_regtab, results='hide', include=FALSE}
 psyInd_dep_hst_enl_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
               female_head + someprimary_head +
@@ -1783,6 +2011,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_dep_hst_enl_regsumm1}
+summary(psyInd_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_dep_hst_enl_regsumm2}
+summary(ksl10_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_dep_hst_enl_regsumm3}
+summary(ksl6_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_dep_hst_enl_regsumm4}
+summary(phq_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_dep_hst_enl_regsumm5}
+summary(gad_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Psychological distress index (`psych_distress_index`)
@@ -1967,7 +2240,7 @@ contrast(gad_dep_hst_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psych_ref_stfu_regtab}
+```{r psych_ref_stfu_regtab, results='hide', include=FALSE}
 psyInd_ref_stfu_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
               female_head + someprimary_head +
@@ -2067,6 +2340,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_ref_stfu_regsumm1}
+summary(psyInd_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_ref_stfu_regsumm2}
+summary(ksl10_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_ref_stfu_regsumm3}
+summary(ksl6_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_ref_stfu_regsumm4}
+summary(phq_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_ref_stfu_regsumm5}
+summary(gad_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -2236,7 +2554,7 @@ contrast(gad_ref_stfu_emm_rbst,
 
 
 Let's take a look at regression table first.
-```{r psych_ref_enl_regtab}
+```{r psych_ref_enl_regtab, results='hide', include=FALSE}
 psyInd_ref_enl_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t + kessler_6_bsl +
               female_head + someprimary_head +
@@ -2337,6 +2655,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_ref_enl_regsumm1}
+summary(psyInd_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_ref_enl_regsumm2}
+summary(ksl10_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_ref_enl_regsumm3}
+summary(ksl6_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_ref_enl_regsumm4}
+summary(phq_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_ref_enl_regsumm5}
+summary(gad_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 Now let's look at the estimated means for each outcome variable for each condition.
@@ -2511,7 +2874,7 @@ contrast(gad_ref_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psych_dep_ref_stfu_regtab}
+```{r psych_dep_ref_stfu_regtab, results='hide', include=FALSE}
 psyInd_dep_stfu_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
               female_head + someprimary_head +
@@ -2612,6 +2975,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_dep_ref_stfu_regsumm1}
+summary(psyInd_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_dep_ref_stfu_regsumm2}
+summary(ksl10_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_dep_ref_stfu_regsumm3}
+summary(ksl6_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_dep_ref_stfu_regsumm4}
+summary(phq_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_dep_ref_stfu_regsumm5}
+summary(gad_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Psychological distress index (`psych_distress_index`)
@@ -2793,7 +3201,7 @@ contrast(gad_dep_ref_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psych_dep_ref_enl_regtab}
+```{r psych_dep_ref_enl_regtab, results='hide', include=FALSE}
 psyInd_dep_ref_enl_lm_rbst_fe <-
   lm_robust(psych_distress_index ~ g_t*dep + kessler_6_bsl +
               female_head + someprimary_head +
@@ -2890,6 +3298,51 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Psychological distress index
+```{r psych_dep_ref_enl_regsumm1}
+summary(psyInd_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 10 total
+```{r psych_dep_ref_enl_regsumm2}
+summary(ksl10_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Kessler 6 total
+```{r psych_dep_ref_enl_regsumm3}
+summary(ksl6_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+PHQ total
+```{r psych_dep_ref_enl_regsumm4}
+summary(phq_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+GAD total
+```{r psych_dep_ref_enl_regsumm5}
+summary(gad_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Psychological distress index (`psych_distress_index`)
@@ -3074,7 +3527,7 @@ contrast(gad_dep_ref_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_stfu_regtab}
+```{r EconFSC_stfu_regtab, results='hide', include=FALSE}
 econInd_stfu_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -3143,6 +3596,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_stfu_regsumm1}
+summary(econInd_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_stfu_regsumm2}
+summary(fcs_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 #### Econ activity index (`econ_activity_index`)
@@ -3311,7 +3782,7 @@ contrast(fcs_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_enl_regtab}
+```{r EconFSC_enl_regtab, results='hide', include=FALSE}
 econInd_enl_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head + somesecondary_head + hhsize +
@@ -3379,6 +3850,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_enl_regsumm1}
+summary(econInd_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_enl_regsumm2}
+summary(fcs_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 #### Econ activity index (`econ_activity_index`)
@@ -3550,7 +4039,7 @@ contrast(fcs_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_hst_stfu_regtab}
+```{r EconFSC_hst_stfu_regtab, results='hide', include=FALSE}
 econInd_hst_stfu_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t +  bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -3621,6 +4110,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_hst_stfu_regsumm1}
+summary(econInd_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_hst_stfu_regsumm2}
+summary(fcs_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -3790,7 +4297,7 @@ contrast(fcs_hst_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_hst_enl_regtab}
+```{r EconFSC_hst_enl_regtab, results='hide', include=FALSE}
 econInd_hst_enl_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl
             + female_head + someprimary_head +
@@ -3860,6 +4367,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_hst_enl_regsumm1}
+summary(econInd_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_hst_enl_regsumm2}
+summary(fcs_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -4031,7 +4556,7 @@ contrast(fcs_hst_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_dep_hst_stfu_regtab}
+```{r EconFSC_dep_hst_stfu_regtab, results='hide', include=FALSE}
 econInd_dep_stfu_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -4102,6 +4627,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_dep_hst_stfu_regsumm1}
+summary(econInd_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_dep_hst_stfu_regsumm2}
+summary(fcs_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -4278,7 +4821,7 @@ contrast(fcs_dep_hst_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_dep_hst_enl_regtab}
+```{r EconFSC_dep_hst_enl_regtab, results='hide', include=FALSE}
 econInd_dep_hst_enl_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -4348,6 +4891,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_dep_hst_enl_regsumm1}
+summary(econInd_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food consumption score
+```{r EconFSC_dep_hst_enl_regsumm2}
+summary(fcs_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -4527,7 +5088,7 @@ contrast(fcs_dep_hst_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_ref_stfu_regtab}
+```{r EconFSC_ref_stfu_regtab, results='hide', include=FALSE}
 econInd_ref_stfu_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -4598,6 +5159,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_ref_stfu_regsumm1}
+summary(econInd_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_ref_stfu_regsumm2}
+summary(fcs_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -4767,7 +5346,7 @@ contrast(fcs_ref_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_ref_enl_regtab}
+```{r EconFSC_ref_enl_regtab, results='hide', include=FALSE}
 econInd_ref_enl_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -4837,6 +5416,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_ref_enl_regsumm1}
+summary(econInd_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_ref_enl_regsumm2}
+summary(fcs_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -5008,7 +5605,7 @@ contrast(fcs_ref_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r EconFSC_dep_ref_stfu_regtab}
+```{r EconFSC_dep_ref_stfu_regtab, results='hide', include=FALSE}
 econInd_dep_stfu_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -5079,6 +5676,24 @@ modelsummary(
   output = "html",
   escape = FALSE
 )
+```
+
+Economic activity index
+```{r EconFSC_dep_ref_stfu_regsumm1}
+summary(econInd_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food Consumption score
+```{r EconFSC_dep_ref_stfu_regsumm2}
+summary(fcs_dep_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 ```
 
 ##### Econ activity index (`econ_activity_index`)
@@ -5254,7 +5869,7 @@ contrast(fcs_dep_ref_stfu_emm_rbst,
 
 
 Let's take a look at regression table first.
-```{r EconFSC_dep_ref_enl_regtab}
+```{r EconFSC_dep_ref_enl_regtab, results='hide', include=FALSE}
 econInd_dep_ref_enl_lm_rbst_fe <-
   lm_robust(econ_activity_index ~ g_t*dep + bsl_fambus + bsl_outhh_empl +
               female_head + someprimary_head +
@@ -5326,6 +5941,24 @@ modelsummary(
 )
 ```
 
+
+Economic activity index
+```{r EconFSC_dep_ref_enl_regsumm1}
+summary(econInd_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Food consumption score
+```{r EconFSC_dep_ref_enl_regsumm2}
+summary(fcs_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 ##### Econ activity index (`econ_activity_index`)
 ```{r econInd_dep_ref_enl}
@@ -5505,7 +6138,7 @@ contrast(fcs_dep_ref_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_stfu_regtab}
+```{r psyWB_stfu_regtab, results='hide', include=FALSE}
 psyWB_stfu_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -5583,6 +6216,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_stfu_regsumm1}
+summary(psyWB_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_stfu_regsumm2}
+summary(subjP_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_stfu_regsumm3}
+summary(cantr_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_stfu_regsumm4}
+summary(posAff_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -5714,7 +6383,7 @@ contrast(posAff_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_enl_regtab}
+```{r psyWB_enl_regtab, results='hide', include=FALSE}
 psyWB_enl_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -5792,6 +6461,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_enl_regsumm1}
+summary(psyWB_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_enl_regsumm2}
+summary(subjP_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_enl_regsumm3}
+summary(cantr_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_enl_regsumm4}
+summary(posAff_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -5927,7 +6632,7 @@ contrast(posAff_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_hst_stfu_regtab}
+```{r psyWB_hst_stfu_regtab, results='hide', include=FALSE}
 psyWB_hst_stfu_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -6005,6 +6710,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_hst_stfu_regsumm1}
+summary(psyWB_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_hst_stfu_regsumm2}
+summary(subjP_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_hst_stfu_regsumm3}
+summary(cantr_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_hst_stfu_regsumm4}
+summary(posAff_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -6136,7 +6877,7 @@ contrast(posAff_hst_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_hst_enl_regtab}
+```{r psyWB_hst_enl_regtab, results='hide', include=FALSE}
 psyWB_hst_enl_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -6214,6 +6955,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_hst_enl_regsumm1}
+summary(psyWB_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_hst_enl_regsumm2}
+summary(subjP_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_hst_enl_regsumm3}
+summary(cantr_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_hst_enl_regsumm4}
+summary(posAff_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -6347,7 +7124,7 @@ contrast(posAff_hst_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_dep_hst_stfu_regtab}
+```{r psyWB_dep_hst_stfu_regtab, results='hide', include=FALSE}
 psyWB_dep_hst_stfu_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -6425,6 +7202,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_dep_hst_stfu_regsumm1}
+summary(psyWB_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_dep_hst_stfu_regsumm2}
+summary(subjP_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_dep_hst_stfu_regsumm3}
+summary(cantr_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_dep_hst_stfu_regsumm4}
+summary(posAff_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -6560,7 +7373,7 @@ contrast(posAff_dep_hst_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_dep_hst_enl_regtab}
+```{r psyWB_dep_hst_enl_regtab, results='hide', include=FALSE}
 psyWB_dep_hst_enl_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -6638,6 +7451,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_dep_hst_enl_regsumm1}
+summary(psyWB_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_dep_hst_enl_regsumm2}
+summary(subjP_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_dep_hst_enl_regsumm3}
+summary(cantr_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_dep_hst_enl_regsumm4}
+summary(posAff_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -6777,7 +7626,7 @@ contrast(posAff_dep_hst_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_ref_stfu_regtab}
+```{r psyWB_ref_stfu_regtab, results='hide', include=FALSE}
 psyWB_ref_stfu_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -6855,6 +7704,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_ref_stfu_regsumm1}
+summary(psyWB_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_ref_stfu_regsumm2}
+summary(subjP_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_ref_stfu_regsumm3}
+summary(cantr_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_ref_stfu_regsumm4}
+summary(posAff_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -6986,7 +7871,7 @@ contrast(posAff_ref_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_ref_enl_regtab}
+```{r psyWB_ref_enl_regtab, results='hide', include=FALSE}
 psyWB_ref_enl_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -7064,6 +7949,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_ref_enl_regsumm1}
+summary(psyWB_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_ref_enl_regsumm2}
+summary(subjP_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_ref_enl_regsumm3}
+summary(cantr_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_ref_enl_regsumm4}
+summary(posAff_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -7197,7 +8118,7 @@ contrast(posAff_ref_enl_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_dep_ref_stfu_regtab}
+```{r psyWB_dep_ref_stfu_regtab, results='hide', include=FALSE}
 psyWB_dep_ref_stfu_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -7275,6 +8196,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_dep_ref_stfu_regsumm1}
+summary(psyWB_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_dep_ref_stfu_regsumm2}
+summary(subjP_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_dep_ref_stfu_regsumm3}
+summary(cantr_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_dep_ref_stfu_regsumm4}
+summary(posAff_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -7410,7 +8367,7 @@ contrast(posAff_dep_ref_stfu_emm_rbst,
 
 Let's take a look at regression table first.
 
-```{r psyWB_dep_ref_enl_regtab}
+```{r psyWB_dep_ref_enl_regtab, results='hide', include=FALSE}
 psyWB_dep_ref_enl_lm_rbst_fe <-
   lm_robust(psych_well_being_z ~ g_t*dep + cantrils_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
             fixed_effects = ~ c2_vil_clus_id,
@@ -7488,6 +8445,42 @@ modelsummary(
 )
 ```
 
+
+Psychological wellbeing index
+```{r psyWB_dep_ref_enl_regsumm1}
+summary(psyWB_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective peacefulness
+```{r psyWB_dep_ref_enl_regsumm2}
+summary(subjP_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Cantril's ladder
+```{r psyWB_dep_ref_enl_regsumm3}
+summary(cantr_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Positive affect
+```{r psyWB_dep_ref_enl_regsumm4}
+summary(posAff_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
 Now let's look at the estimated means for each outcome variable for each condition.
 
@@ -7608,6 +8601,2453 @@ summary(posAff_dep_ref_enl_emm_rbst, infer = TRUE) %>%
   kable_styling(full_width = TRUE)
 
 contrast(posAff_dep_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+
+# BRFSS
+
+## Pooled Effect
+
+### 3-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_stfu_regtab, results='hide', include=FALSE}
+brfssInd_stfu_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+goodFunc_stfu_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+subHlth_stfu_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+hlthyDays_stfu_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_stfu_lm_rbst_fe,
+    "Good-function days" = goodFunc_stfu_lm_rbst_fe,
+    "Subjective health avg" = subHlth_stfu_lm_rbst_fe,
+    "Healthy days" = hlthyDays_stfu_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 35. Effect of Group Therapy on BRFSS Health Index at 3m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_stfu_regsumm1}
+summary(brfssInd_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_stfu_regsumm2}
+summary(goodFunc_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_stfu_regsumm3}
+summary(subHlth_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_stfu_regsumm4}
+summary(hlthyDays_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+#### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_stfu}
+brfssInd_stfu_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+joint_tests(brfssInd_stfu_lm_rbst)
+
+brfssInd_stfu_emm_rbst <-
+  emmeans(brfssInd_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Good-function days (`good_function_days`)
+```{r goodFunc_stfu}
+goodFunc_stfu_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+joint_tests(goodFunc_stfu_lm_rbst)
+
+goodFunc_stfu_emm_rbst <-
+  emmeans(goodFunc_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Subjective health avg (`sub_health_avg`)
+```{r subHlth_stfu}
+subHlth_stfu_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+joint_tests(subHlth_stfu_lm_rbst)
+
+subHlth_stfu_emm_rbst <-
+  emmeans(subHlth_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Healthy days (`healthy_days`)
+```{r hlthyDays_stfu}
+hlthyDays_stfu_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins)
+
+joint_tests(hlthyDays_stfu_lm_rbst)
+
+hlthyDays_stfu_emm_rbst <-
+  emmeans(hlthyDays_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+### 20-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_enl_regtab, results='hide', include=FALSE}
+brfssInd_enl_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+goodFunc_enl_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+subHlth_enl_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+hlthyDays_enl_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_enl_lm_rbst_fe,
+    "Good-function days" = goodFunc_enl_lm_rbst_fe,
+    "Subjective health avg" = subHlth_enl_lm_rbst_fe,
+    "Healthy days" = hlthyDays_enl_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 36. Effect of Group Therapy on BRFSS Health Index at 20m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_enl_regsumm1}
+summary(brfssInd_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_enl_regsumm2}
+summary(goodFunc_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_enl_regsumm3}
+summary(subHlth_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_enl_regsumm4}
+summary(hlthyDays_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+#### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_enl}
+brfssInd_enl_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+joint_tests(brfssInd_enl_lm_rbst)
+
+brfssInd_enl_emm_rbst <-
+  emmeans(brfssInd_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Good-function days (`good_function_days`)
+```{r goodFunc_enl}
+goodFunc_enl_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+joint_tests(goodFunc_enl_lm_rbst)
+
+goodFunc_enl_emm_rbst <-
+  emmeans(goodFunc_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Subjective health avg (`sub_health_avg`)
+```{r subHlth_enl}
+subHlth_enl_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+joint_tests(subHlth_enl_lm_rbst)
+
+subHlth_enl_emm_rbst <-
+  emmeans(subHlth_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### Healthy days (`healthy_days`)
+```{r hlthyDays_enl}
+hlthyDays_enl_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins)
+
+joint_tests(hlthyDays_enl_lm_rbst)
+
+hlthyDays_enl_emm_rbst <-
+  emmeans(hlthyDays_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+## Hosts
+
+### pooled
+
+#### 3-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_hst_stfu_regtab, results='hide', include=FALSE}
+brfssInd_hst_stfu_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+goodFunc_hst_stfu_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+subHlth_hst_stfu_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+hlthyDays_hst_stfu_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_hst_stfu_lm_rbst_fe,
+    "Good-function days" = goodFunc_hst_stfu_lm_rbst_fe,
+    "Subjective health avg" = subHlth_hst_stfu_lm_rbst_fe,
+    "Healthy days" = hlthyDays_hst_stfu_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 37. Effect of Group Therapy on BRFSS Health Index at 3m FU Among Hosts",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_hst_stfu_regsumm1}
+summary(brfssInd_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_hst_stfu_regsumm2}
+summary(goodFunc_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_hst_stfu_regsumm3}
+summary(subHlth_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_hst_stfu_regsumm4}
+summary(hlthyDays_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_hst_stfu}
+brfssInd_hst_stfu_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(brfssInd_hst_stfu_lm_rbst)
+
+brfssInd_hst_stfu_emm_rbst <-
+  emmeans(brfssInd_hst_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_hst_stfu}
+goodFunc_hst_stfu_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(goodFunc_hst_stfu_lm_rbst)
+
+goodFunc_hst_stfu_emm_rbst <-
+  emmeans(goodFunc_hst_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_hst_stfu}
+subHlth_hst_stfu_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(subHlth_hst_stfu_lm_rbst)
+
+subHlth_hst_stfu_emm_rbst <-
+  emmeans(subHlth_hst_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_hst_stfu}
+hlthyDays_hst_stfu_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(hlthyDays_hst_stfu_lm_rbst)
+
+hlthyDays_hst_stfu_emm_rbst <-
+  emmeans(hlthyDays_hst_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### 20-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_hst_enl_regtab, results='hide', include=FALSE}
+brfssInd_hst_enl_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+goodFunc_hst_enl_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+subHlth_hst_enl_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+hlthyDays_hst_enl_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_hst_enl_lm_rbst_fe,
+    "Good-function days" = goodFunc_hst_enl_lm_rbst_fe,
+    "Subjective health avg" = subHlth_hst_enl_lm_rbst_fe,
+    "Healthy days" = hlthyDays_hst_enl_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 38. Effect of Group Therapy on BRFSS Health Index at 20m FU Among Hosts",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_hst_enl_regsumm1}
+summary(brfssInd_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_hst_enl_regsumm2}
+summary(goodFunc_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_hst_enl_regsumm3}
+summary(subHlth_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_hst_enl_regsumm4}
+summary(hlthyDays_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_hst_enl}
+brfssInd_hst_enl_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(brfssInd_hst_enl_lm_rbst)
+
+brfssInd_hst_enl_emm_rbst <-
+  emmeans(brfssInd_hst_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_hst_enl}
+goodFunc_hst_enl_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(goodFunc_hst_enl_lm_rbst)
+
+goodFunc_hst_enl_emm_rbst <-
+  emmeans(goodFunc_hst_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_hst_enl}
+subHlth_hst_enl_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(subHlth_hst_enl_lm_rbst)
+
+subHlth_hst_enl_emm_rbst <-
+  emmeans(subHlth_hst_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_hst_enl}
+hlthyDays_hst_enl_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(hlthyDays_hst_enl_lm_rbst)
+
+hlthyDays_hst_enl_emm_rbst <-
+  emmeans(hlthyDays_hst_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+### by baseline distress level
+
+#### 3-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_dep_hst_stfu_regtab, results='hide', include=FALSE}
+brfssInd_dep_hst_stfu_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+goodFunc_dep_hst_stfu_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+subHlth_dep_hst_stfu_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+hlthyDays_dep_hst_stfu_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 0))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_dep_hst_stfu_lm_rbst_fe,
+    "Good-function days" = goodFunc_dep_hst_stfu_lm_rbst_fe,
+    "Subjective health avg" = subHlth_dep_hst_stfu_lm_rbst_fe,
+    "Healthy days" = hlthyDays_dep_hst_stfu_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "dep"                = "high baseline distress",
+    "g_t:dep"            = "group therapy × high baseline distress",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 39. Effect of Group Therapy on BRFSS Health Index Among Hosts by Baseline Distress Level at 3m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_dep_hst_stfu_regsumm1}
+summary(brfssInd_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_dep_hst_stfu_regsumm2}
+summary(goodFunc_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_dep_hst_stfu_regsumm3}
+summary(subHlth_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_dep_hst_stfu_regsumm4}
+summary(hlthyDays_dep_hst_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_dep_hst_stfu}
+brfssInd_dep_hst_stfu_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(brfssInd_dep_hst_stfu_lm_rbst)
+
+brfssInd_dep_hst_stfu_emm_rbst <-
+  emmeans(brfssInd_dep_hst_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(brfssInd_dep_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_dep_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_dep_hst_stfu}
+goodFunc_dep_hst_stfu_lm_rbst <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(goodFunc_dep_hst_stfu_lm_rbst)
+
+goodFunc_dep_hst_stfu_emm_rbst <-
+  emmeans(goodFunc_dep_hst_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(goodFunc_dep_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_dep_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_dep_hst_stfu}
+subHlth_dep_hst_stfu_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(subHlth_dep_hst_stfu_lm_rbst)
+
+subHlth_dep_hst_stfu_emm_rbst <-
+  emmeans(subHlth_dep_hst_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(subHlth_dep_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_dep_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_dep_hst_stfu}
+hlthyDays_dep_hst_stfu_lm_rbst <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 0))
+
+joint_tests(hlthyDays_dep_hst_stfu_lm_rbst)
+
+hlthyDays_dep_hst_stfu_emm_rbst <-
+  emmeans(hlthyDays_dep_hst_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(hlthyDays_dep_hst_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_dep_hst_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### 20-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_dep_hst_enl_regtab, results='hide', include=FALSE}
+brfssInd_dep_hst_enl_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+goodFunc_dep_hst_enl_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+subHlth_dep_hst_enl_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+hlthyDays_dep_hst_enl_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 0))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_dep_hst_enl_lm_rbst_fe,
+    "Good-function days" = goodFunc_dep_hst_enl_lm_rbst_fe,
+    "Subjective health avg" = subHlth_dep_hst_enl_lm_rbst_fe,
+    "Healthy days" = hlthyDays_dep_hst_enl_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "dep"                = "high baseline distress",
+    "g_t:dep"            = "group therapy × high baseline distress",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 40. Effect of Group Therapy on BRFSS Health Index Among Hosts by Baseline Distress Level at 20m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_dep_hst_enl_regsumm1}
+summary(brfssInd_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_dep_hst_enl_regsumm2}
+summary(goodFunc_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_dep_hst_enl_regsumm3}
+summary(subHlth_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_dep_hst_enl_regsumm4}
+summary(hlthyDays_dep_hst_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_dep_hst_enl}
+brfssInd_dep_hst_enl_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(brfssInd_dep_hst_enl_lm_rbst)
+
+brfssInd_dep_hst_enl_emm_rbst <-
+  emmeans(brfssInd_dep_hst_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(brfssInd_dep_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_dep_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_dep_hst_enl}
+goodFunc_dep_hst_enl_lm_rbst <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(goodFunc_dep_hst_enl_lm_rbst)
+
+goodFunc_dep_hst_enl_emm_rbst <-
+  emmeans(goodFunc_dep_hst_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(goodFunc_dep_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_dep_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_dep_hst_enl}
+subHlth_dep_hst_enl_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(subHlth_dep_hst_enl_lm_rbst)
+
+subHlth_dep_hst_enl_emm_rbst <-
+  emmeans(subHlth_dep_hst_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(subHlth_dep_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_dep_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_dep_hst_enl}
+hlthyDays_dep_hst_enl_lm_rbst <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 0))
+
+joint_tests(hlthyDays_dep_hst_enl_lm_rbst)
+
+hlthyDays_dep_hst_enl_emm_rbst <-
+  emmeans(hlthyDays_dep_hst_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(hlthyDays_dep_hst_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_dep_hst_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+## Refugee
+
+### pooled
+
+#### 3-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_ref_stfu_regtab, results='hide', include=FALSE}
+brfssInd_ref_stfu_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+goodFunc_ref_stfu_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+subHlth_ref_stfu_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+hlthyDays_ref_stfu_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_ref_stfu_lm_rbst_fe,
+    "Good-function days" = goodFunc_ref_stfu_lm_rbst_fe,
+    "Subjective health avg" = subHlth_ref_stfu_lm_rbst_fe,
+    "Healthy days" = hlthyDays_ref_stfu_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 41. Effect of Group Therapy on BRFSS Health Index at 3m FU Among Refugees",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_ref_stfu_regsumm1}
+summary(brfssInd_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_ref_stfu_regsumm2}
+summary(goodFunc_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_ref_stfu_regsumm3}
+summary(subHlth_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_ref_stfu_regsumm4}
+summary(hlthyDays_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_ref_stfu}
+brfssInd_ref_stfu_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(brfssInd_ref_stfu_lm_rbst)
+
+brfssInd_ref_stfu_emm_rbst <-
+  emmeans(brfssInd_ref_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_ref_stfu}
+goodFunc_ref_stfu_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(goodFunc_ref_stfu_lm_rbst)
+
+goodFunc_ref_stfu_emm_rbst <-
+  emmeans(goodFunc_ref_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_ref_stfu}
+subHlth_ref_stfu_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(subHlth_ref_stfu_lm_rbst)
+
+subHlth_ref_stfu_emm_rbst <-
+  emmeans(subHlth_ref_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_ref_stfu}
+hlthyDays_ref_stfu_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(hlthyDays_ref_stfu_lm_rbst)
+
+hlthyDays_ref_stfu_emm_rbst <-
+  emmeans(hlthyDays_ref_stfu_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### 20-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_ref_enl_regtab, results='hide', include=FALSE}
+brfssInd_ref_enl_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+goodFunc_ref_enl_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+subHlth_ref_enl_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+hlthyDays_ref_enl_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_ref_enl_lm_rbst_fe,
+    "Good-function days" = goodFunc_ref_enl_lm_rbst_fe,
+    "Subjective health avg" = subHlth_ref_enl_lm_rbst_fe,
+    "Healthy days" = hlthyDays_ref_enl_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 42. Effect of Group Therapy on BRFSS Health Index at 20m FU Among Refugees",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_ref_enl_regsumm1}
+summary(brfssInd_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_ref_enl_regsumm2}
+summary(goodFunc_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_ref_enl_regsumm3}
+summary(subHlth_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_ref_enl_regsumm4}
+summary(hlthyDays_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_ref_enl}
+brfssInd_ref_enl_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(brfssInd_ref_enl_lm_rbst)
+
+brfssInd_ref_enl_emm_rbst <-
+  emmeans(brfssInd_ref_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(brfssInd_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_ref_enl}
+goodFunc_ref_enl_lm_rbst <-
+  lm_robust(good_function_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(goodFunc_ref_enl_lm_rbst)
+
+goodFunc_ref_enl_emm_rbst <-
+  emmeans(goodFunc_ref_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(goodFunc_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_ref_enl}
+subHlth_ref_enl_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(subHlth_ref_enl_lm_rbst)
+
+subHlth_ref_enl_emm_rbst <-
+  emmeans(subHlth_ref_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(subHlth_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_ref_enl}
+hlthyDays_ref_enl_lm_rbst <-
+  lm_robust(healthy_days ~ g_t + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(hlthyDays_ref_enl_lm_rbst)
+
+hlthyDays_ref_enl_emm_rbst <-
+  emmeans(hlthyDays_ref_enl_lm_rbst, ~ g_t,
+          at = list(g_t = c(0, 1)))
+
+summary(hlthyDays_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+### by baseline distress level
+
+#### 3-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_dep_ref_stfu_regtab, results='hide', include=FALSE}
+brfssInd_dep_ref_stfu_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+goodFunc_dep_ref_stfu_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+subHlth_dep_ref_stfu_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+hlthyDays_dep_ref_stfu_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>%
+              filter(refugee == 1))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_dep_ref_stfu_lm_rbst_fe,
+    "Good-function days" = goodFunc_dep_ref_stfu_lm_rbst_fe,
+    "Subjective health avg" = subHlth_dep_ref_stfu_lm_rbst_fe,
+    "Healthy days" = hlthyDays_dep_ref_stfu_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "dep"                = "high baseline distress",
+    "g_t:dep"            = "group therapy × high baseline distress",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 43. Effect of Group Therapy on BRFSS Health Index Among Refugees by Baseline Distress Level at 3m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_dep_ref_stfu_regsumm1}
+summary(brfssInd_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_dep_ref_stfu_regsumm2}
+summary(goodFunc_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_dep_ref_stfu_regsumm3}
+summary(subHlth_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_dep_ref_stfu_regsumm4}
+summary(hlthyDays_dep_ref_stfu_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_dep_ref_stfu}
+brfssInd_dep_ref_stfu_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(brfssInd_dep_ref_stfu_lm_rbst)
+
+brfssInd_dep_ref_stfu_emm_rbst <-
+  emmeans(brfssInd_dep_ref_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(brfssInd_dep_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_dep_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_dep_ref_stfu}
+goodFunc_dep_ref_stfu_lm_rbst <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(goodFunc_dep_ref_stfu_lm_rbst)
+
+goodFunc_dep_ref_stfu_emm_rbst <-
+  emmeans(goodFunc_dep_ref_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(goodFunc_dep_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_dep_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_dep_ref_stfu}
+subHlth_dep_ref_stfu_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(subHlth_dep_ref_stfu_lm_rbst)
+
+subHlth_dep_ref_stfu_emm_rbst <-
+  emmeans(subHlth_dep_ref_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(subHlth_dep_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_dep_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_dep_ref_stfu}
+hlthyDays_dep_ref_stfu_lm_rbst <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_stfu_wins %>% filter(refugee == 1))
+
+joint_tests(hlthyDays_dep_ref_stfu_lm_rbst)
+
+hlthyDays_dep_ref_stfu_emm_rbst <-
+  emmeans(hlthyDays_dep_ref_stfu_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(hlthyDays_dep_ref_stfu_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_dep_ref_stfu_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+#### 20-month follow-up
+
+Let's take a look at regression table first.
+
+```{r brfss_dep_ref_enl_regtab, results='hide', include=FALSE}
+brfssInd_dep_ref_enl_lm_rbst_fe <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+goodFunc_dep_ref_enl_lm_rbst_fe <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+subHlth_dep_ref_enl_lm_rbst_fe <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+hlthyDays_dep_ref_enl_lm_rbst_fe <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout,
+            fixed_effects = ~ c2_vil_clus_id,
+            se_type = "HC1",
+            data = C2TB_enl_wins %>%
+              filter(refugee == 1))
+
+modelsummary(
+  list(
+    "BRFSS health index" = brfssInd_dep_ref_enl_lm_rbst_fe,
+    "Good-function days" = goodFunc_dep_ref_enl_lm_rbst_fe,
+    "Subjective health avg" = subHlth_dep_ref_enl_lm_rbst_fe,
+    "Healthy days" = hlthyDays_dep_ref_enl_lm_rbst_fe
+  ),
+  stars       = c(
+    "<sup>†</sup>" = 0.10,
+    "*"                 = 0.05,
+    "**"                = 0.01,
+    "***"               = 0.001
+  ),
+  estimate    = "<span style='display:inline-block;width:5em;text-align:right'>{estimate}<span style='display:inline-block;min-width:1.4em;text-align:left'>{stars}</span></span>",
+  statistic   = "<span style='display:inline-block;width:5em;text-align:right'>({std.error}<span style='display:inline-block;min-width:1.4em;text-align:left'>)</span></span>",
+  fmt         = apa_num,
+  coef_omit   = "c2_vil_clus_id",
+  coef_rename = c(
+    "(Intercept)"        = "(Intercept)",
+    "g_t"                = "group therapy",
+    "dep"                = "high baseline distress",
+    "g_t:dep"            = "group therapy × high baseline distress",
+    "brfss_health_index_bsl"      = "Baseline: BRFSS health index",
+    "female_head"        = "Female-headed HH",
+    "someprimary_head"   = "HH head with some primary schooling",
+    "somesecondary_head" = "HH head with some secondary schooling",
+    "hhsize"             = "Household size",
+    "coh1_holdout"       = "Cohort-1 holdout"
+  ),
+  gof_map = list(
+    list("raw" = "nobs",      "clean" = "N",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           format(round(x)),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>")),
+    list("raw" = "r.squared", "clean" = "R²",
+         "fmt" = function(x) paste0(
+           "<span style='display:inline-block;width:5em;text-align:right'>",
+           apa_num(x),
+           "<span style='display:inline-block;min-width:1.4em'></span></span>"))
+  ),
+  align  = "lcccc",
+  title  = "Table 44. Effect of Group Therapy on BRFSS Health Index Among Refugees by Baseline Distress Level at 20m FU",
+  notes  = c(
+    "Numbers in parentheses are standard errors.",
+    "Village is controlled as a fixed effect but not displayed in the table.",
+    "Heteroskedasticity-consistent (HC1) standard errors."
+  ),
+  output = "html",
+  escape = FALSE
+)
+```
+
+BRFSS health index
+```{r brfss_dep_ref_enl_regsumm1}
+summary(brfssInd_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Good-function days
+```{r brfss_dep_ref_enl_regsumm2}
+summary(goodFunc_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Subjective health avg
+```{r brfss_dep_ref_enl_regsumm3}
+summary(subHlth_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Healthy days
+```{r brfss_dep_ref_enl_regsumm4}
+summary(hlthyDays_dep_ref_enl_lm_rbst_fe)$coefficients |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  tibble::as_tibble() |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Now let's look at the estimated means for each outcome variable for each condition.
+
+##### BRFSS health index (`brfss_health_index`)
+```{r brfssInd_dep_ref_enl}
+brfssInd_dep_ref_enl_lm_rbst <-
+  lm_robust(brfss_health_index ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(brfssInd_dep_ref_enl_lm_rbst)
+
+brfssInd_dep_ref_enl_emm_rbst <-
+  emmeans(brfssInd_dep_ref_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(brfssInd_dep_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(brfssInd_dep_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Good-function days (`good_function_days`)
+```{r goodFunc_dep_ref_enl}
+goodFunc_dep_ref_enl_lm_rbst <-
+  lm_robust(good_function_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(goodFunc_dep_ref_enl_lm_rbst)
+
+goodFunc_dep_ref_enl_emm_rbst <-
+  emmeans(goodFunc_dep_ref_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(goodFunc_dep_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(goodFunc_dep_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Subjective health avg (`sub_health_avg`)
+```{r subHlth_dep_ref_enl}
+subHlth_dep_ref_enl_lm_rbst <-
+  lm_robust(sub_health_avg ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(subHlth_dep_ref_enl_lm_rbst)
+
+subHlth_dep_ref_enl_emm_rbst <-
+  emmeans(subHlth_dep_ref_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(subHlth_dep_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(subHlth_dep_ref_enl_emm_rbst,
+         method = list("GIPT - no GIPT" = c(-1, 1))) %>%
+  summary(infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")
+        ) %>%
+  kable_styling(full_width = TRUE)
+```
+
+##### Healthy days (`healthy_days`)
+```{r hlthyDays_dep_ref_enl}
+hlthyDays_dep_ref_enl_lm_rbst <-
+  lm_robust(healthy_days ~ g_t*dep + brfss_health_index_bsl + female_head + someprimary_head + somesecondary_head + hhsize + coh1_holdout + factor(c2_vil_clus_id),
+            se_type = "HC1",
+            data = C2TB_enl_wins %>% filter(refugee == 1))
+
+joint_tests(hlthyDays_dep_ref_enl_lm_rbst)
+
+hlthyDays_dep_ref_enl_emm_rbst <-
+  emmeans(hlthyDays_dep_ref_enl_lm_rbst, ~ g_t|dep,
+          at = list(g_t = c(0, 1), dep = c(0, 1)))
+
+summary(hlthyDays_dep_ref_enl_emm_rbst, infer = TRUE) %>%
+  format_model_table() %>%
+  kable(digits = 3,
+        col.names = c("GIPT", "distressed @ bsl", "est.", "SE", "df",
+                      "lower CI", "upper CI", "t", "p")) %>%
+  kable_styling(full_width = TRUE)
+
+contrast(hlthyDays_dep_ref_enl_emm_rbst,
          method = list("GIPT - no GIPT" = c(-1, 1))) %>%
   summary(infer = TRUE) %>%
   format_model_table() %>%
@@ -7825,7 +11265,7 @@ kableExtra::kbl(soc_tbl,
 
 # Joint Tables
 ```{r keyDV_reg}
-# Reuses the 8 pooled *_lm_rbst_fe models defined earlier in this Rmd.
+# Reuses the 10 pooled *_lm_rbst_fe models defined earlier in this Rmd.
 # `coef_map` fixes the predictor ORDER: g_t first, then each DV's matching
 # baseline control (rows collapse: only the rows with data show a value
 # for a given column), then the shared stratification covariates.
@@ -7833,10 +11273,12 @@ modelsummary(
   list(
     "Psych distress<br>(3m FU)"    = psyInd_stfu_lm_rbst_fe,
     "Psych well-being<br>(3m FU)"  = psyWB_stfu_lm_rbst_fe,
+    "BRFSS<br>(3m FU)"             = brfssInd_stfu_lm_rbst_fe,
     "Econ activity<br>(3m FU)"     = econInd_stfu_lm_rbst_fe,
     "FCS<br>(3m FU)"               = fcs_stfu_lm_rbst_fe,
     "Psych distress<br>(20m FU)"   = psyInd_enl_lm_rbst_fe,
     "Psych well-being<br>(20m FU)" = psyWB_enl_lm_rbst_fe,
+    "BRFSS<br>(20m FU)"            = brfssInd_enl_lm_rbst_fe,
     "Econ activity<br>(20m FU)"    = econInd_enl_lm_rbst_fe,
     "FCS<br>(20m FU)"              = fcs_enl_lm_rbst_fe
   ),
@@ -7854,11 +11296,12 @@ modelsummary(
     # 1. treatment
     "g_t"                = "Group therapy",
     # 2. per-DV baseline control (each row is non-empty only for the models that use it)
-    "kessler_6_bsl"      = "Baseline: Kessler-6",
-    "cantrils_bsl"       = "Baseline: global life satisfaction",
-    "bsl_fambus"         = "Baseline: family owns business",
-    "bsl_outhh_empl"     = "Baseline: HH member working for pay",
-    "fcs_bsl"            = "Baseline: FCS",
+    "kessler_6_bsl"          = "Baseline: Kessler-6",
+    "cantrils_bsl"           = "Baseline: global life satisfaction",
+    "brfss_health_index_bsl" = "Baseline: BRFSS health index",
+    "bsl_fambus"             = "Baseline: family owns business",
+    "bsl_outhh_empl"         = "Baseline: HH member working for pay",
+    "fcs_bsl"                = "Baseline: FCS",
     # 3. shared stratification covariates
     "female_head"        = "Female-headed HH",
     "someprimary_head"   = "HH head with some primary schooling",
@@ -7878,7 +11321,7 @@ modelsummary(
            apa_num(x),
            "<span style='display:inline-block;min-width:1.4em'></span></span>"))
   ),
-  align  = "lcccccccc",
+  align  = "lcccccccccc",
   output = "html",
   escape = FALSE
 )
